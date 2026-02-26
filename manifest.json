@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Save to Google Photos",
+  "version": "0.1.0",
+  "description": "Right-click any image and save it to Google Photos.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwUOPYzpgF8c0KyX6LUzkaoKQVLPwHEubp6JlTjHZltgCwUQwU0KIvTcJBJIUDw/12E7ZO0PDo/z6cY4DWA9cYuFl2SbiaVasWOEGGV6jp2sEbkjIBDW/mATzQ70YJ8u3XFzmk7QKEBAxkngLdAw+JsJx6B++5K8+8t2x/F8/1+qUbzoww9J3VWNwI9GqkEmbJmWXR/ah8CgvZboFm+MwSUpbBYyFiJeyM7YgXBVuyKdA49OGYcUBCe6D8InVheZxM+oec+CLUrvjEIf6xv5BjQ7iLhFrLh2pPwuFhwadSW/hJN8ICgK8SHxJ7WXWXEywiO2vHbKe+aHniOpTajc2WQIDAQAB",
+  "background": {
+    "service_worker": "dist/sw.js",
+    "type": "module"
+  },
+  "permissions": ["contextMenus", "identity", "notifications"],
+  "host_permissions": [
+    "https://photoslibrary.googleapis.com/*",
+    "https://accounts.google.com/*",
+    "https://oauth2.googleapis.com/*",
+    "http://*/*",
+    "https://*/*"
+  ],
+  "oauth2": {
+    "client_id": "478240865692-d14npticheu6si2cqjbm5cbehal1j91l.apps.googleusercontent.com",
+    "scopes": ["https://www.googleapis.com/auth/photoslibrary.appendonly"]
+  }
+}

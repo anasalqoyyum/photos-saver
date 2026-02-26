@@ -1,0 +1,19 @@
+{
+  "name": "photos-saver-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chrome extension to save right-clicked images to Google Photos",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --import tsx tests/**/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "@types/chrome": "^0.1.21",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  },
+  "packageManager": "pnpm@10.26.1+sha512.664074abc367d2c9324fdc18037097ce0a8f126034160f709928e9e9f95d98714347044e5c3164d65bd5da6c59c6be362b107546292a8eecb7999196e5ce58fa"
+}
