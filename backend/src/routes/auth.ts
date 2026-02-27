@@ -53,7 +53,7 @@ export async function registerAuthRoutes(
 
       const state = crypto.randomUUID()
       const createdAt = Date.now()
-      options.authStateStore.create({
+      await options.authStateStore.create({
         state,
         extensionRedirectUri,
         createdAt,
@@ -95,7 +95,7 @@ export async function registerAuthRoutes(
       })
     }
 
-    const authState = options.authStateStore.consume(state)
+    const authState = await options.authStateStore.consume(state)
     if (!authState) {
       return reply.code(400).send({
         error: 'INVALID_OR_EXPIRED_STATE'
@@ -114,7 +114,13 @@ export async function registerAuthRoutes(
       })
     }
 
-    const existing = options.googleTokenStore.getByUserId(userId)
+    if (options.config.allowedGoogleUserId && options.config.allowedGoogleUserId !== userId) {
+      return reply.code(403).send({
+        error: 'GOOGLE_USER_NOT_ALLOWED'
+      })
+    }
+
+    const existing = await options.googleTokenStore.getByUserId(userId)
     const refreshToken = tokenPayload.refresh_token || existing?.refreshToken
     if (!refreshToken) {
       return reply.code(400).send({
@@ -123,14 +129,14 @@ export async function registerAuthRoutes(
       })
     }
 
-    options.googleTokenStore.upsert({
+    await options.googleTokenStore.upsert({
       userId,
       refreshToken,
       ...(tokenPayload.scope ? { scope: tokenPayload.scope } : {}),
       updatedAt: Date.now()
     })
 
-    const exchangeCode = options.exchangeCodeStore.create(
+    const exchangeCode = await options.exchangeCodeStore.create(
       userId,
       options.config.exchangeCodeTtlMs
     )
@@ -150,14 +156,14 @@ export async function registerAuthRoutes(
         })
       }
 
-      const exchangeCode = options.exchangeCodeStore.consume(sessionCode)
+      const exchangeCode = await options.exchangeCodeStore.consume(sessionCode)
       if (!exchangeCode) {
         return reply.code(401).send({
           error: 'INVALID_OR_EXPIRED_SESSION_CODE'
         })
       }
 
-      const session = options.sessionStore.create(
+      const session = await options.sessionStore.create(
         exchangeCode.userId,
         options.config.sessionTtlMs
       )
@@ -175,7 +181,7 @@ export async function registerAuthRoutes(
       return reply.code(401).send({ error: 'MISSING_AUTHORIZATION' })
     }
 
-    options.sessionStore.revoke(token)
+    await options.sessionStore.revoke(token)
     return reply.code(204).send()
   })
 }

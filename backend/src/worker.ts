@@ -2,6 +2,7 @@ import { FastifyInstance, InjectOptions } from 'fastify'
 
 import { buildApp } from './app.js'
 import { loadConfig } from './config.js'
+import { WorkerBindings } from './worker-bindings.js'
 
 let appPromise: Promise<FastifyInstance> | null = null
 
@@ -18,8 +19,17 @@ function getApp(env: Record<string, unknown>): Promise<FastifyInstance> {
       }
     }
 
+    const bindings: WorkerBindings = {
+      ...(env.APP_DB
+        ? { APP_DB: env.APP_DB as NonNullable<WorkerBindings['APP_DB']> }
+        : {}),
+      ...(env.AUTH_KV
+        ? { AUTH_KV: env.AUTH_KV as NonNullable<WorkerBindings['AUTH_KV']> }
+        : {})
+    }
+
     const config = loadConfig(normalizedEnv)
-    appPromise = buildApp(config)
+    appPromise = buildApp(config, bindings)
   }
 
   return appPromise

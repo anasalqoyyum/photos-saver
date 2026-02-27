@@ -3,6 +3,8 @@ export interface AppConfig {
   googleClientSecret: string
   googleOauthRedirectUri: string
   googleScopes: string[]
+  allowedGoogleUserId?: string
+  tokenEncryptionKey?: string
   corsOrigin: string
   sessionTtlMs: number
   authStateTtlMs: number
@@ -51,6 +53,12 @@ export function loadConfig(
       'GOOGLE_OAUTH_REDIRECT_URI'
     ),
     googleScopes,
+    ...(env.ALLOWED_GOOGLE_USER_ID
+      ? { allowedGoogleUserId: env.ALLOWED_GOOGLE_USER_ID.trim() }
+      : {}),
+    ...(env.TOKEN_ENCRYPTION_KEY
+      ? { tokenEncryptionKey: env.TOKEN_ENCRYPTION_KEY.trim() }
+      : {}),
     corsOrigin: env.CORS_ORIGIN || '*',
     sessionTtlMs: parseNumber(env.SESSION_TTL_MS, 15 * 60 * 1000),
     authStateTtlMs: parseNumber(env.AUTH_STATE_TTL_MS, 5 * 60 * 1000),

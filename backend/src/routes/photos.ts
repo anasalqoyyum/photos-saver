@@ -44,7 +44,7 @@ export async function registerPhotosRoutes(
         return reply.code(401).send({ error: 'MISSING_AUTHORIZATION' })
       }
 
-      const session = options.sessionStore.get(bearerToken)
+      const session = await options.sessionStore.get(bearerToken)
       if (!session) {
         return reply.code(401).send({ error: 'INVALID_OR_EXPIRED_SESSION' })
       }
@@ -74,7 +74,9 @@ export async function registerPhotosRoutes(
         })
       }
 
-      const storedGoogleToken = options.googleTokenStore.getByUserId(session.userId)
+      const storedGoogleToken = await options.googleTokenStore.getByUserId(
+        session.userId
+      )
       if (!storedGoogleToken) {
         return reply.code(401).send({ error: 'USER_NOT_LINKED_TO_GOOGLE' })
       }
@@ -90,7 +92,7 @@ export async function registerPhotosRoutes(
       }
 
       if (refreshed.refresh_token) {
-        options.googleTokenStore.upsert({
+        await options.googleTokenStore.upsert({
           ...storedGoogleToken,
           refreshToken: refreshed.refresh_token,
           ...(refreshed.scope ? { scope: refreshed.scope } : {}),

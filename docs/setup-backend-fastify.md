@@ -19,8 +19,19 @@ Set these for the backend runtime:
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
 - `GOOGLE_OAUTH_REDIRECT_URI` (must match Google OAuth config exactly)
+- `TOKEN_ENCRYPTION_KEY` (base64/base64url 32-byte key)
 - Optional: `GOOGLE_SCOPES`
 - Optional: `CORS_ORIGIN`
+- Optional: `ALLOWED_GOOGLE_USER_ID` (set this to your own Google `sub` user id for single-user lock)
+
+## 2b) Configure Cloudflare bindings
+
+In `backend/wrangler.toml`, set real IDs for:
+
+- `AUTH_KV` (KV namespace)
+- `APP_DB` (D1 database)
+
+Apply D1 migration from `backend/migrations/0001_google_tokens.sql`.
 
 ## 3) Configure extension backend mode
 
@@ -31,6 +42,7 @@ Edit `src/backend-config.ts`:
 
 ## 4) Runtime notes
 
-- The backend currently uses in-memory stores for auth state, session tokens, and Google refresh tokens.
-- In production, replace these with durable storage (for example D1/KV + encryption at rest).
+- In Cloudflare runtime with bindings configured, backend uses durable KV + D1 storage.
+- Google refresh tokens are encrypted at rest using `TOKEN_ENCRYPTION_KEY`.
+- In local Node dev (`backend/src/server.ts`), backend falls back to in-memory stores.
 - If deploying to Cloudflare Workers, validate large payload behavior and timeout limits for image upload requests.

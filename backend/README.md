@@ -7,8 +7,10 @@ Fastify backend for OAuth and Google Photos uploads.
 - `GOOGLE_CLIENT_ID` - Google OAuth client ID
 - `GOOGLE_CLIENT_SECRET` - Google OAuth client secret
 - `GOOGLE_OAUTH_REDIRECT_URI` - backend callback URL (`https://<backend-host>/v1/auth/callback`)
+- `TOKEN_ENCRYPTION_KEY` - base64/base64url 32-byte key for refresh-token encryption at rest
 - `GOOGLE_SCOPES` (optional)
 - `CORS_ORIGIN` (optional, default `*`)
+- `ALLOWED_GOOGLE_USER_ID` (optional, recommended for single-user mode)
 - `SESSION_TTL_MS` (optional)
 - `AUTH_STATE_TTL_MS` (optional)
 - `EXCHANGE_CODE_TTL_MS` (optional)
@@ -33,5 +35,23 @@ pnpm --filter photos-saver-backend dev
 ## Cloudflare
 
 This repo includes `wrangler.toml` and a Workers `fetch` adapter (`src/worker.ts`) that routes requests into Fastify via `inject`.
+
+### Durable storage bindings
+
+- KV binding `AUTH_KV` for auth state, one-time exchange codes, and session tokens.
+- D1 binding `APP_DB` for encrypted Google refresh-token records.
+
+Apply migrations:
+
+```bash
+wrangler d1 migrations apply photos-saver-backend --local
+wrangler d1 migrations apply photos-saver-backend --remote
+```
+
+Generate encryption key (example):
+
+```bash
+openssl rand -base64 32
+```
 
 Before deploying, verify runtime behavior for your target plan and payload sizes.
