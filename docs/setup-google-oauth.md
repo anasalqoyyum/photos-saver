@@ -96,3 +96,5 @@ If `key` is not set, Chrome can generate different IDs in different environments
   - The redirect URI must be exactly `https://<your-extension-id>.chromiumapp.org/`.
   - In the Web OAuth client, add that exact URI under Authorized redirect URIs.
   - Ensure `<your-extension-id>` matches the runtime ID shown in service worker logs.
+
+If you switch to backend mode, use `docs/setup-backend-fastify.md` for backend OAuth setup.

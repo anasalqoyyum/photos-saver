@@ -27,7 +27,11 @@ When clicked, it uploads the original image bytes to Google Photos with:
 - `src/filename.ts` - filename + description helpers.
 - `src/errors.ts` - error normalization and user messages.
 - `src/notify.ts` - success/failure notifications.
+- `src/backend-api.ts` - backend auth + upload client.
+- `src/backend-config.ts` - backend mode toggle and base URL.
+- `backend/` - Fastify backend project.
 - `docs/setup-google-oauth.md` - OAuth and Google Cloud setup.
+- `docs/setup-backend-fastify.md` - backend mode setup.
 
 ## Setup
 
@@ -37,6 +41,13 @@ When clicked, it uploads the original image bytes to Google Photos with:
 3. Build TypeScript to `dist/`:
    - `pnpm build`
 4. Load unpacked extension in `chrome://extensions`.
+
+## Backend mode (optional)
+
+1. Follow `docs/setup-backend-fastify.md`.
+2. Set `src/backend-config.ts` `BACKEND_MODE_ENABLED = true`.
+3. Set `src/backend-config.ts` `BACKEND_BASE_URL`.
+4. Rebuild extension and reload.
 
 ## Commands
 
@@ -56,6 +67,7 @@ When clicked, it uploads the original image bytes to Google Photos with:
 - Chrome: uses `chrome.identity.getAuthToken` first.
 - ungoogled-chromium: if `getAuthToken` fails or times out, extension falls back to OAuth PKCE via `chrome.identity.launchWebAuthFlow`.
 - PKCE fallback reuses `manifest.json` `oauth2.client_id` by default; optional override is available in `src/oauth-config.ts`.
+- Backend mode avoids browser-specific OAuth implementation differences by delegating auth and Google API calls to Fastify backend endpoints.
 
 ## Future enhancement
 

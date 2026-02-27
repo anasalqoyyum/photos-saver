@@ -1,4 +1,6 @@
 import { getAccessToken, invalidateToken } from './auth.js'
+import { uploadImageViaBackend } from './backend-api.js'
+import { BACKEND_MODE_ENABLED } from './backend-config.js'
 import { CONTEXT_MENU_ID, CONTEXT_MENU_TITLE } from './constants.js'
 import { normalizeError, toUserMessage } from './errors.js'
 import { normalizeDescription } from './filename.js'
@@ -66,7 +68,18 @@ async function uploadImageWithToken(
   return image.fileName
 }
 
+async function uploadImageWithBackend(sourceUrl: string): Promise<string> {
+  debug('Using backend upload mode.', { sourceUrl })
+  const image = await fetchImageFromSource(sourceUrl)
+  await uploadImageViaBackend(image)
+  return image.fileName
+}
+
 async function saveImageToGooglePhotos(sourceUrl: string): Promise<string> {
+  if (BACKEND_MODE_ENABLED) {
+    return uploadImageWithBackend(sourceUrl)
+  }
+
   debug('Resolving OAuth token for save request.', { sourceUrl })
   const initialToken = await getAccessToken()
 
