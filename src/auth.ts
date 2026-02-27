@@ -13,6 +13,24 @@ const TOKEN_EXPIRY_SKEW_MS = 30_000
 
 let pkceTokenCache: CachedToken | null = null
 
+function isLikelyGoogleChrome(): boolean {
+  const navWithUaData = navigator as Navigator & {
+    userAgentData?: {
+      brands?: Array<{
+        brand: string
+      }>
+    }
+  }
+
+  const brands = navWithUaData.userAgentData?.brands
+  if (Array.isArray(brands) && brands.length > 0) {
+    return brands.some(entry => entry.brand.toLowerCase() === 'google chrome')
+  }
+
+  const ua = navigator.userAgent || ''
+  return /Chrome\/\d+/i.test(ua) && !/Edg\//i.test(ua) && !/OPR\//i.test(ua)
+}
+
 function getAuthToken(
   details: chrome.identity.TokenDetails
 ): Promise<AuthTokenResult> {
@@ -115,6 +133,18 @@ export async function getAccessToken(): Promise<string> {
     warn('Non-interactive token unavailable, falling back to interactive.', {
       message: error instanceof Error ? error.message : 'Unknown error'
     })
+  }
+
+  if (!isLikelyGoogleChrome()) {
+    debug('Browser does not appear to be Google Chrome; skipping identity interactive flow.')
+    const pkceToken = await getAccessTokenViaWebAuthFlow()
+    pkceTokenCache =
+      typeof pkceToken.expiresAt === 'number'
+        ? { token: pkceToken.accessToken, expiresAt: pkceToken.expiresAt }
+        : { token: pkceToken.accessToken }
+
+    debug('Using PKCE token acquired via web auth flow.')
+    return pkceToken.accessToken
   }
 
   try {

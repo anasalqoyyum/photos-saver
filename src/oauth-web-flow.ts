@@ -1,11 +1,13 @@
 import { ExtensionError } from './errors.js'
 import { debug, warn } from './logger.js'
+import { WEB_OAUTH_CLIENT_ID } from './oauth-config.js'
 
 const AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth'
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
 
 interface OAuthConfig {
-  clientId: string
+  extensionClientId: string
+  webAuthClientId: string
   scopes: string[]
 }
 
@@ -22,13 +24,19 @@ function getOAuthConfigFromManifest(): OAuthConfig {
     }
   }
 
-  const clientId = manifest.oauth2?.client_id?.trim()
-  if (!clientId || clientId.startsWith('REPLACE_WITH_')) {
+  const extensionClientId = manifest.oauth2?.client_id?.trim()
+  if (!extensionClientId || extensionClientId.startsWith('REPLACE_WITH_')) {
     throw new ExtensionError(
       'AUTH_FAILED',
       'OAuth client_id is missing in manifest.json.'
     )
   }
+
+  const webAuthClientIdRaw = WEB_OAUTH_CLIENT_ID.trim()
+  const webAuthClientId =
+    webAuthClientIdRaw && !webAuthClientIdRaw.startsWith('REPLACE_WITH_')
+      ? webAuthClientIdRaw
+      : extensionClientId
 
   const scopes = manifest.oauth2?.scopes ?? []
   if (!Array.isArray(scopes) || scopes.length === 0) {
@@ -36,7 +44,8 @@ function getOAuthConfigFromManifest(): OAuthConfig {
   }
 
   return {
-    clientId,
+    extensionClientId,
+    webAuthClientId,
     scopes
   }
 }
@@ -126,13 +135,40 @@ async function exchangeCodeForToken(params: {
 
   if (!response.ok) {
     const text = await response.text()
+    let providerError = 'unknown_error'
+    let providerDescription = text
+
+    try {
+      const json = JSON.parse(text) as {
+        error?: string
+        error_description?: string
+      }
+
+      providerError = json.error || providerError
+      providerDescription = json.error_description || providerDescription
+    } catch {
+      // Keep raw text when JSON parsing fails.
+    }
+
     warn('Token exchange failed.', {
       status: response.status,
-      body: text.slice(0, 300)
+      error: providerError,
+      description: providerDescription.slice(0, 300)
     })
+
+    if (
+      providerError === 'invalid_client' &&
+      providerDescription.toLowerCase().includes('client_secret')
+    ) {
+      throw new ExtensionError(
+        'AUTH_FAILED',
+        'OAuth token exchange requires client_secret for this client. Use a Chrome Extension OAuth client ID for PKCE fallback, or leave WEB_OAUTH_CLIENT_ID as placeholder to reuse manifest oauth2.client_id.'
+      )
+    }
+
     throw new ExtensionError(
       'AUTH_FAILED',
-      `OAuth token exchange failed with status ${response.status}.`
+      `OAuth token exchange failed (${providerError}): ${providerDescription}`
     )
   }
 
@@ -164,41 +200,78 @@ async function exchangeCodeForToken(params: {
 
 export async function getAccessTokenViaWebAuthFlow(): Promise<TokenResult> {
   const oauthConfig = getOAuthConfigFromManifest()
-  const { codeVerifier, codeChallenge } = await createPkcePair()
-  const redirectUri = chrome.identity.getRedirectURL('oauth2')
+  const redirectUri = chrome.identity.getRedirectURL()
 
-  const authUrl = new URL(AUTH_ENDPOINT)
-  authUrl.searchParams.set('client_id', oauthConfig.clientId)
-  authUrl.searchParams.set('redirect_uri', redirectUri)
-  authUrl.searchParams.set('response_type', 'code')
-  authUrl.searchParams.set('scope', oauthConfig.scopes.join(' '))
-  authUrl.searchParams.set('code_challenge', codeChallenge)
-  authUrl.searchParams.set('code_challenge_method', 'S256')
-  authUrl.searchParams.set('include_granted_scopes', 'true')
-  authUrl.searchParams.set('access_type', 'online')
-
-  debug('Starting OAuth web auth flow (PKCE fallback).')
-  const redirectUrl = await launchWebAuthFlow(authUrl.toString())
-
-  const redirect = new URL(redirectUrl)
-  const oauthError = redirect.searchParams.get('error')
-  if (oauthError) {
-    throw new ExtensionError('AUTH_FAILED', `OAuth provider returned error: ${oauthError}`)
+  if (oauthConfig.webAuthClientId === oauthConfig.extensionClientId) {
+    warn('PKCE flow is using extension OAuth client ID. A separate Web client ID is recommended.')
   }
 
-  const code = redirect.searchParams.get('code')
-  if (!code) {
-    throw new ExtensionError('AUTH_FAILED', 'OAuth provider did not return an authorization code.')
+  const runFlow = async (clientId: string): Promise<TokenResult> => {
+    const { codeVerifier, codeChallenge } = await createPkcePair()
+
+    const authUrl = new URL(AUTH_ENDPOINT)
+    authUrl.searchParams.set('client_id', clientId)
+    authUrl.searchParams.set('redirect_uri', redirectUri)
+    authUrl.searchParams.set('response_type', 'code')
+    authUrl.searchParams.set('scope', oauthConfig.scopes.join(' '))
+    authUrl.searchParams.set('code_challenge', codeChallenge)
+    authUrl.searchParams.set('code_challenge_method', 'S256')
+    authUrl.searchParams.set('include_granted_scopes', 'true')
+    authUrl.searchParams.set('access_type', 'online')
+
+    debug('Starting OAuth web auth flow (PKCE fallback).', {
+      redirectUri,
+      usingClientId: clientId
+    })
+    const redirectUrl = await launchWebAuthFlow(authUrl.toString())
+
+    const redirect = new URL(redirectUrl)
+    const oauthError = redirect.searchParams.get('error')
+    if (oauthError) {
+      if (oauthError === 'redirect_uri_mismatch') {
+        throw new ExtensionError(
+          'AUTH_FAILED',
+          `redirect_uri_mismatch: configure OAuth redirect URI ${redirectUri} for client ${clientId}.`
+        )
+      }
+
+      throw new ExtensionError('AUTH_FAILED', `OAuth provider returned error: ${oauthError}`)
+    }
+
+    const code = redirect.searchParams.get('code')
+    if (!code) {
+      throw new ExtensionError('AUTH_FAILED', 'OAuth provider did not return an authorization code.')
+    }
+
+    debug('OAuth auth code received; exchanging for access token.', {
+      usingClientId: clientId
+    })
+    const token = await exchangeCodeForToken({
+      code,
+      codeVerifier,
+      redirectUri,
+      clientId
+    })
+
+    debug('OAuth PKCE token exchange completed.', {
+      usingClientId: clientId
+    })
+    return token
   }
 
-  debug('OAuth auth code received; exchanging for access token.')
-  const token = await exchangeCodeForToken({
-    code,
-    codeVerifier,
-    redirectUri,
-    clientId: oauthConfig.clientId
-  })
+  try {
+    return await runFlow(oauthConfig.webAuthClientId)
+  } catch (error) {
+    const shouldRetryWithExtensionClient =
+      oauthConfig.webAuthClientId !== oauthConfig.extensionClientId &&
+      error instanceof ExtensionError &&
+      error.message.includes('client_secret')
 
-  debug('OAuth PKCE token exchange completed.')
-  return token
+    if (!shouldRetryWithExtensionClient) {
+      throw error
+    }
+
+    warn('Configured WEB_OAUTH_CLIENT_ID requires client secret. Retrying PKCE with extension client ID.')
+    return runFlow(oauthConfig.extensionClientId)
+  }
 }

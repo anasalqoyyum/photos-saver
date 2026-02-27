@@ -40,12 +40,25 @@ How to get extension ID:
 
 Note: The extension ID must match the ID used in OAuth credentials.
 
+## 4b) Create OAuth client for Web Auth PKCE fallback (recommended for ungoogled-chromium)
+
+1. Open `APIs & Services` -> `Credentials` -> `Create credentials` -> `OAuth client ID`.
+2. Application type: `Web application`.
+3. Add Authorized redirect URI:
+   - `https://<your-extension-id>.chromiumapp.org/`
+4. Copy this web client ID.
+
 ## 5) Update manifest
 
 Edit `manifest.json`:
 
 - Replace `oauth2.client_id` with your generated client ID.
 - (Optional but recommended) Replace `key` with your extension public key to keep a stable extension ID across reloads/machines.
+
+Edit `src/oauth-config.ts`:
+
+- Leave `WEB_OAUTH_CLIENT_ID` as placeholder to reuse `manifest.json` `oauth2.client_id` (recommended default).
+- Only set `WEB_OAUTH_CLIENT_ID` if you specifically need a separate Web OAuth client.
 
 If `key` is not set, Chrome can generate different IDs in different environments, which can break OAuth Item ID matching.
 
@@ -78,3 +91,8 @@ If `key` is not set, Chrome can generate different IDs in different environments
 - ungoogled-chromium does not show Google consent with `getAuthToken`:
   - This extension automatically falls back to OAuth PKCE web flow (`launchWebAuthFlow`).
   - Ensure `manifest.json` has host permissions for `https://accounts.google.com/*` and `https://oauth2.googleapis.com/*`.
+  - If using a separate web client, set it in `src/oauth-config.ts` `WEB_OAUTH_CLIENT_ID`.
+- `redirect_uri_mismatch` during PKCE fallback:
+  - The redirect URI must be exactly `https://<your-extension-id>.chromiumapp.org/`.
+  - In the Web OAuth client, add that exact URI under Authorized redirect URIs.
+  - Ensure `<your-extension-id>` matches the runtime ID shown in service worker logs.

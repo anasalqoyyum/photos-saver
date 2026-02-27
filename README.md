@@ -55,6 +55,7 @@ When clicked, it uploads the original image bytes to Google Photos with:
 
 - Chrome: uses `chrome.identity.getAuthToken` first.
 - ungoogled-chromium: if `getAuthToken` fails or times out, extension falls back to OAuth PKCE via `chrome.identity.launchWebAuthFlow`.
+- PKCE fallback reuses `manifest.json` `oauth2.client_id` by default; optional override is available in `src/oauth-config.ts`.
 
 ## Future enhancement
 
