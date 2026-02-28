@@ -1,9 +1,9 @@
 import { AppConfig } from './config.js'
 import {
   AuthStateStore,
-  CloudflareKVAuthStateStore,
-  CloudflareKVExchangeCodeStore,
   CloudflareKVSessionStore,
+  D1AuthStateStore,
+  D1ExchangeCodeStore,
   D1GoogleTokenStore,
   ExchangeCodeStore,
   GoogleTokenStore,
@@ -58,8 +58,8 @@ export async function createStoresForRuntime(
   const cipher = await TokenCipher.fromSecret(config.tokenEncryptionKey)
 
   return {
-    authStateStore: new CloudflareKVAuthStateStore(bindings.AUTH_KV),
-    exchangeCodeStore: new CloudflareKVExchangeCodeStore(bindings.AUTH_KV),
+    authStateStore: new D1AuthStateStore(bindings.APP_DB),
+    exchangeCodeStore: new D1ExchangeCodeStore(bindings.APP_DB),
     sessionStore: new CloudflareKVSessionStore(bindings.AUTH_KV),
     googleTokenStore: new D1GoogleTokenStore(bindings.APP_DB, cipher)
   }

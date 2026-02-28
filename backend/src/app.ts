@@ -7,6 +7,49 @@ import { registerPhotosRoutes } from './routes/photos.js'
 import { createStoresForRuntime } from './store-factory.js'
 import { WorkerBindings } from './worker-bindings.js'
 
+const LOCAL_ORIGIN_PATTERNS = [
+  /^http:\/\/localhost(?::\d+)?$/,
+  /^http:\/\/127\.0\.0\.1(?::\d+)?$/
+]
+
+const EXTENSION_ORIGIN_PATTERN = /^chrome-extension:\/\/[a-p]{32}$/
+
+function defaultCorsOrigins(): RegExp[] {
+  return [...LOCAL_ORIGIN_PATTERNS, EXTENSION_ORIGIN_PATTERN]
+}
+
+function parseCorsOrigin(
+  corsOrigin: string | undefined
+): true | string | Array<string | RegExp> {
+  if (!corsOrigin) {
+    return defaultCorsOrigins()
+  }
+
+  if (corsOrigin === '*') {
+    return true
+  }
+
+  const parts = corsOrigin
+    .split(',')
+    .map(part => part.trim())
+    .filter(Boolean)
+
+  if (parts.length === 0) {
+    return defaultCorsOrigins()
+  }
+
+  if (parts.length === 1) {
+    const [singleOrigin] = parts
+    if (singleOrigin) {
+      return singleOrigin
+    }
+
+    return defaultCorsOrigins()
+  }
+
+  return parts
+}
+
 export async function buildApp(
   config: AppConfig = loadConfig(),
   bindings?: WorkerBindings
@@ -17,7 +60,7 @@ export async function buildApp(
   })
 
   await app.register(cors, {
-    origin: config.corsOrigin === '*' ? true : config.corsOrigin,
+    origin: parseCorsOrigin(config.corsOrigin),
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
   })

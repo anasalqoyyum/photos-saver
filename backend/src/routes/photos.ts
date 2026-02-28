@@ -19,7 +19,13 @@ interface PhotosRoutesOptions {
   googleTokenStore: GoogleTokenStore
 }
 
-function base64ToBytes(base64: string): Uint8Array {
+const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
+
+function base64ToBytes(base64: string): Uint8Array | null {
+  if (!BASE64_PATTERN.test(base64)) {
+    return null
+  }
+
   return Uint8Array.from(Buffer.from(base64, 'base64'))
 }
 
@@ -32,12 +38,55 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
+function uploadBodySchema(maxUploadBytes: number) {
+  const maxBase64Length = Math.ceil((maxUploadBytes * 4) / 3) + 4
+
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: ['imageBase64', 'fileName', 'sourceUrl'],
+    properties: {
+      imageBase64: {
+        type: 'string',
+        minLength: 1,
+        maxLength: maxBase64Length
+      },
+      fileName: {
+        type: 'string',
+        minLength: 1,
+        maxLength: 255
+      },
+      sourceUrl: {
+        type: 'string',
+        minLength: 1,
+        maxLength: 4096
+      },
+      contentType: {
+        anyOf: [
+          {
+            type: 'string',
+            maxLength: 255
+          },
+          {
+            type: 'null'
+          }
+        ]
+      }
+    }
+  }
+}
+
 export async function registerPhotosRoutes(
   app: FastifyInstance,
   options: PhotosRoutesOptions
 ): Promise<void> {
   app.post<{ Body: UploadRequestBody }>(
     '/v1/photos/upload',
+    {
+      schema: {
+        body: uploadBodySchema(options.config.maxUploadBytes)
+      }
+    },
     async (request, reply) => {
       const bearerToken = parseBearerToken(request.headers.authorization)
       if (!bearerToken) {
@@ -63,6 +112,10 @@ export async function registerPhotosRoutes(
       }
 
       const bytes = base64ToBytes(imageBase64)
+      if (!bytes) {
+        return reply.code(400).send({ error: 'INVALID_IMAGE_BASE64' })
+      }
+
       if (bytes.byteLength === 0) {
         return reply.code(400).send({ error: 'EMPTY_IMAGE_PAYLOAD' })
       }

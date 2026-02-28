@@ -24,6 +24,8 @@ Set these for the backend runtime:
 - Optional: `CORS_ORIGIN`
 - Optional: `ALLOWED_GOOGLE_USER_ID` (set this to your own Google `sub` user id for single-user lock)
 
+If `CORS_ORIGIN` is unset, backend defaults to allowing `chrome-extension://<id>` and localhost HTTP origins.
+
 For local Node development, create `backend/.env` (for example by copying `backend/.env.example`).
 
 ## 2b) Configure Cloudflare bindings
@@ -33,7 +35,7 @@ In `backend/wrangler.toml`, set real IDs for:
 - `AUTH_KV` (KV namespace)
 - `APP_DB` (D1 database)
 
-Apply D1 migration from `backend/migrations/0001_google_tokens.sql`.
+Apply D1 migrations from `backend/migrations/`.
 
 ## 3) Configure extension backend mode
 
@@ -44,7 +46,7 @@ Edit `src/backend-config.ts`:
 
 ## 4) Runtime notes
 
-- In Cloudflare runtime with bindings configured, backend uses durable KV + D1 storage.
+- In Cloudflare runtime with bindings configured, backend uses KV for sessions and D1 for tokens + one-time auth artifacts.
 - Google refresh tokens are encrypted at rest using `TOKEN_ENCRYPTION_KEY`.
 - In local Node dev (`backend/src/server.ts`), backend falls back to in-memory stores.
 - If deploying to Cloudflare Workers, validate large payload behavior and timeout limits for image upload requests.

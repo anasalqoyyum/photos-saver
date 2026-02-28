@@ -5,7 +5,7 @@ export interface AppConfig {
   googleScopes: string[]
   allowedGoogleUserId?: string
   tokenEncryptionKey?: string
-  corsOrigin: string
+  corsOrigin?: string
   sessionTtlMs: number
   authStateTtlMs: number
   exchangeCodeTtlMs: number
@@ -59,7 +59,7 @@ export function loadConfig(
     ...(env.TOKEN_ENCRYPTION_KEY
       ? { tokenEncryptionKey: env.TOKEN_ENCRYPTION_KEY.trim() }
       : {}),
-    corsOrigin: env.CORS_ORIGIN || '*',
+    ...(env.CORS_ORIGIN?.trim() ? { corsOrigin: env.CORS_ORIGIN.trim() } : {}),
     sessionTtlMs: parseNumber(env.SESSION_TTL_MS, 15 * 60 * 1000),
     authStateTtlMs: parseNumber(env.AUTH_STATE_TTL_MS, 5 * 60 * 1000),
     exchangeCodeTtlMs: parseNumber(env.EXCHANGE_CODE_TTL_MS, 2 * 60 * 1000),

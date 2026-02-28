@@ -244,6 +244,112 @@ export class CloudflareKVExchangeCodeStore implements ExchangeCodeStore {
   }
 }
 
+interface D1AuthStateRow {
+  state: string
+  extension_redirect_uri: string
+  created_at: number
+  expires_at: number
+}
+
+export class D1AuthStateStore implements AuthStateStore {
+  constructor(private readonly db: D1DatabaseLike) {}
+
+  async create(state: AuthStateRecord): Promise<void> {
+    await this.db
+      .prepare('DELETE FROM auth_states WHERE expires_at <= ?1')
+      .bind(now())
+      .run()
+
+    await this.db
+      .prepare(
+        `INSERT INTO auth_states (state, extension_redirect_uri, created_at, expires_at)
+         VALUES (?1, ?2, ?3, ?4)`
+      )
+      .bind(state.state, state.extensionRedirectUri, state.createdAt, state.expiresAt)
+      .run()
+  }
+
+  async consume(state: string): Promise<AuthStateRecord | null> {
+    const row = await this.db
+      .prepare(
+        `DELETE FROM auth_states
+         WHERE state = ?1
+         RETURNING state, extension_redirect_uri, created_at, expires_at`
+      )
+      .bind(state)
+      .first<D1AuthStateRow>()
+
+    if (!row || isExpired(row.expires_at)) {
+      return null
+    }
+
+    return {
+      state: row.state,
+      extensionRedirectUri: row.extension_redirect_uri,
+      createdAt: row.created_at,
+      expiresAt: row.expires_at
+    }
+  }
+}
+
+interface D1ExchangeCodeRow {
+  code: string
+  user_id: string
+  created_at: number
+  expires_at: number
+}
+
+export class D1ExchangeCodeStore implements ExchangeCodeStore {
+  constructor(private readonly db: D1DatabaseLike) {}
+
+  async create(userId: string, ttlMs: number): Promise<ExchangeCodeRecord> {
+    await this.db
+      .prepare('DELETE FROM exchange_codes WHERE expires_at <= ?1')
+      .bind(now())
+      .run()
+
+    const createdAt = now()
+    const record: ExchangeCodeRecord = {
+      code: randomToken('xchg'),
+      userId,
+      createdAt,
+      expiresAt: createdAt + ttlMs
+    }
+
+    await this.db
+      .prepare(
+        `INSERT INTO exchange_codes (code, user_id, created_at, expires_at)
+         VALUES (?1, ?2, ?3, ?4)`
+      )
+      .bind(record.code, record.userId, record.createdAt, record.expiresAt)
+      .run()
+
+    return record
+  }
+
+  async consume(code: string): Promise<ExchangeCodeRecord | null> {
+    const row = await this.db
+      .prepare(
+        `DELETE FROM exchange_codes
+         WHERE code = ?1
+         RETURNING code, user_id, created_at, expires_at`
+      )
+      .bind(code)
+      .first<D1ExchangeCodeRow>()
+
+    if (!row || isExpired(row.expires_at)) {
+      return null
+    }
+
+    return {
+      code: row.code,
+      userId: row.user_id,
+      createdAt: row.created_at,
+      expiresAt: row.expires_at
+    }
+  }
+}
+
 export class CloudflareKVSessionStore implements SessionStore {
   constructor(private readonly kv: KVNamespaceLike) {}
 

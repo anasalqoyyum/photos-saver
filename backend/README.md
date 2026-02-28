@@ -9,7 +9,7 @@ Fastify backend for OAuth and Google Photos uploads.
 - `GOOGLE_OAUTH_REDIRECT_URI` - backend callback URL (`https://<backend-host>/v1/auth/callback`)
 - `TOKEN_ENCRYPTION_KEY` - base64/base64url 32-byte key for refresh-token encryption at rest
 - `GOOGLE_SCOPES` (optional)
-- `CORS_ORIGIN` (optional, default `*`)
+- `CORS_ORIGIN` (optional; defaults to `chrome-extension://<id>` and localhost origins)
 - `ALLOWED_GOOGLE_USER_ID` (optional, recommended for single-user mode)
 - `SESSION_TTL_MS` (optional)
 - `AUTH_STATE_TTL_MS` (optional)
@@ -41,8 +41,8 @@ This repo includes `wrangler.toml` and a Workers `fetch` adapter (`src/worker.ts
 
 ### Durable storage bindings
 
-- KV binding `AUTH_KV` for auth state, one-time exchange codes, and session tokens.
-- D1 binding `APP_DB` for encrypted Google refresh-token records.
+- KV binding `AUTH_KV` for session tokens.
+- D1 binding `APP_DB` for encrypted Google refresh-token records and one-time auth artifacts.
 
 Apply migrations:
 
