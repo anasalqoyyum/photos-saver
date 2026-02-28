@@ -8,10 +8,10 @@ enabled = true
 
 [[kv_namespaces]]
 binding = "AUTH_KV"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "ae52b3c57afa4269bda449933cba0424"
 
 [[d1_databases]]
 binding = "APP_DB"
-database_name = "photos-saver-backend"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_name = "APP_DB"
+database_id = "11cdf975-13b9-4bfa-846b-7e5f47616687"
 migrations_dir = "migrations"
