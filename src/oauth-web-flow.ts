@@ -79,6 +79,10 @@ async function createPkcePair(): Promise<{
   }
 }
 
+function createOAuthState(): string {
+  return toBase64Url(crypto.getRandomValues(new Uint8Array(24)))
+}
+
 function launchWebAuthFlow(authUrl: string): Promise<string> {
   return new Promise((resolve, reject) => {
     chrome.identity.launchWebAuthFlow(
@@ -208,6 +212,7 @@ export async function getAccessTokenViaWebAuthFlow(): Promise<TokenResult> {
 
   const runFlow = async (clientId: string): Promise<TokenResult> => {
     const { codeVerifier, codeChallenge } = await createPkcePair()
+    const expectedState = createOAuthState()
 
     const authUrl = new URL(AUTH_ENDPOINT)
     authUrl.searchParams.set('client_id', clientId)
@@ -216,6 +221,7 @@ export async function getAccessTokenViaWebAuthFlow(): Promise<TokenResult> {
     authUrl.searchParams.set('scope', oauthConfig.scopes.join(' '))
     authUrl.searchParams.set('code_challenge', codeChallenge)
     authUrl.searchParams.set('code_challenge_method', 'S256')
+    authUrl.searchParams.set('state', expectedState)
     authUrl.searchParams.set('include_granted_scopes', 'true')
     authUrl.searchParams.set('access_type', 'online')
 
@@ -236,6 +242,11 @@ export async function getAccessTokenViaWebAuthFlow(): Promise<TokenResult> {
       }
 
       throw new ExtensionError('AUTH_FAILED', `OAuth provider returned error: ${oauthError}`)
+    }
+
+    const receivedState = redirect.searchParams.get('state')
+    if (!receivedState || receivedState !== expectedState) {
+      throw new ExtensionError('AUTH_FAILED', 'OAuth state did not match the request.')
     }
 
     const code = redirect.searchParams.get('code')

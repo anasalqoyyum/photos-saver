@@ -7,7 +7,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --import tsx tests/**/*.test.ts"
+    "test": "node --test --import tsx tests/**/*.test.ts",
+    "backend:dev": "pnpm --filter photos-saver-backend dev",
+    "backend:typecheck": "pnpm --filter photos-saver-backend typecheck",
+    "backend:test": "pnpm --filter photos-saver-backend test"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
