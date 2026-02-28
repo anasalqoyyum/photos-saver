@@ -1,4 +1,3 @@
-import cors from '@fastify/cors'
 import Fastify, { FastifyInstance } from 'fastify'
 
 import { AppConfig, loadConfig } from './config.js'
@@ -10,6 +9,8 @@ import { WorkerBindings } from './worker-bindings.js'
 interface BuildAppOptions {
   logger?: boolean
 }
+
+type CorsOriginConfig = true | string | Array<string | RegExp>
 
 const LOCAL_ORIGIN_PATTERNS = [
   /^http:\/\/localhost(?::\d+)?$/,
@@ -24,7 +25,7 @@ function defaultCorsOrigins(): RegExp[] {
 
 function parseCorsOrigin(
   corsOrigin: string | undefined
-): true | string | Array<string | RegExp> {
+): CorsOriginConfig {
   if (!corsOrigin) {
     return defaultCorsOrigins()
   }
@@ -54,6 +55,60 @@ function parseCorsOrigin(
   return parts
 }
 
+function isOriginAllowed(origin: string, config: CorsOriginConfig): boolean {
+  if (config === true) {
+    return true
+  }
+
+  if (typeof config === 'string') {
+    return origin === config
+  }
+
+  return config.some(rule => {
+    if (typeof rule === 'string') {
+      return origin === rule
+    }
+
+    return rule.test(origin)
+  })
+}
+
+function registerCorsHooks(app: FastifyInstance, corsConfig: CorsOriginConfig): void {
+  app.addHook('onRequest', async (request, reply) => {
+    const originHeader = request.headers.origin
+    const method = request.method
+
+    let allowOrigin: string | null = null
+    if (originHeader) {
+      if (isOriginAllowed(originHeader, corsConfig)) {
+        allowOrigin = corsConfig === true ? '*' : originHeader
+      }
+    } else if (corsConfig === true) {
+      allowOrigin = '*'
+    }
+
+    if (allowOrigin) {
+      reply.header('Access-Control-Allow-Origin', allowOrigin)
+      if (allowOrigin !== '*') {
+        reply.header('Vary', 'Origin')
+      }
+    }
+
+    if (method !== 'OPTIONS') {
+      return
+    }
+
+    if (originHeader && !allowOrigin) {
+      return reply.code(403).send({ error: 'CORS_ORIGIN_NOT_ALLOWED' })
+    }
+
+    reply.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    reply.header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    reply.header('Access-Control-Max-Age', '86400')
+    return reply.code(204).send()
+  })
+}
+
 export async function buildApp(
   config: AppConfig = loadConfig(),
   bindings?: WorkerBindings,
@@ -64,11 +119,7 @@ export async function buildApp(
     bodyLimit: config.maxUploadBytes * 2
   })
 
-  await app.register(cors, {
-    origin: parseCorsOrigin(config.corsOrigin),
-    methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-  })
+  registerCorsHooks(app, parseCorsOrigin(config.corsOrigin))
 
   const stores = await createStoresForRuntime(config, bindings)
 
