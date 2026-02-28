@@ -6,6 +6,11 @@ compatibility_flags = ["nodejs_compat"]
 [observability]
 enabled = true
 
+[vars]
+GOOGLE_CLIENT_ID = "478240865692-hqht6c29pg3lspglq2hbtc95djiakj7u.apps.googleusercontent.com"
+GOOGLE_OAUTH_REDIRECT_URI = "https://photos-saver.anas-alqoyyum.workers.dev/v1/auth/callback"
+CORS_ORIGIN = "*"
+
 [[kv_namespaces]]
 binding = "AUTH_KV"
 id = "ae52b3c57afa4269bda449933cba0424"
