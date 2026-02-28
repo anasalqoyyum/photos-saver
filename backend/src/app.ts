@@ -38,10 +38,9 @@ export async function buildApp(
     googleTokenStore: stores.googleTokenStore
   })
 
-  app.get('/v1/health', async () => {
+  app.get('/health', async () => {
     return {
-      status: 'ok',
-      now: new Date().toISOString()
+      status: 'ok'
     }
   })
 

@@ -24,6 +24,8 @@ Set these for the backend runtime:
 - Optional: `CORS_ORIGIN`
 - Optional: `ALLOWED_GOOGLE_USER_ID` (set this to your own Google `sub` user id for single-user lock)
 
+For local Node development, create `backend/.env` (for example by copying `backend/.env.example`).
+
 ## 2b) Configure Cloudflare bindings
 
 In `backend/wrangler.toml`, set real IDs for:

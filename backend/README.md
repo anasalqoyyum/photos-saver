@@ -29,8 +29,11 @@ Fastify backend for OAuth and Google Photos uploads.
 
 ```bash
 pnpm --filter photos-saver-backend install
+cp backend/.env.example backend/.env
 pnpm --filter photos-saver-backend dev
 ```
+
+`src/server.ts` loads `backend/.env` automatically for local Node development.
 
 ## Cloudflare
 
