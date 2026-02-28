@@ -7,6 +7,10 @@ import { registerPhotosRoutes } from './routes/photos.js'
 import { createStoresForRuntime } from './store-factory.js'
 import { WorkerBindings } from './worker-bindings.js'
 
+interface BuildAppOptions {
+  logger?: boolean
+}
+
 const LOCAL_ORIGIN_PATTERNS = [
   /^http:\/\/localhost(?::\d+)?$/,
   /^http:\/\/127\.0\.0\.1(?::\d+)?$/
@@ -52,10 +56,11 @@ function parseCorsOrigin(
 
 export async function buildApp(
   config: AppConfig = loadConfig(),
-  bindings?: WorkerBindings
+  bindings?: WorkerBindings,
+  options: BuildAppOptions = {}
 ): Promise<FastifyInstance> {
   const app = Fastify({
-    logger: true,
+    logger: options.logger ?? true,
     bodyLimit: config.maxUploadBytes * 2
   })
 
