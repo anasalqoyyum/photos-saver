@@ -35,9 +35,39 @@ function getApp(env: Record<string, unknown>): Promise<FastifyInstance> {
   return appPromise
 }
 
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  return 'Unknown error'
+}
+
+function jsonError(status: number, error: string, detail?: string): Response {
+  return new Response(
+    JSON.stringify({
+      error,
+      ...(detail ? { detail } : {})
+    }),
+    {
+      status,
+      headers: {
+        'content-type': 'application/json; charset=utf-8'
+      }
+    }
+  )
+}
+
 export default {
   async fetch(request: Request, env: Record<string, unknown>): Promise<Response> {
-    const app = await getApp(env)
+    let app: FastifyInstance
+    try {
+      app = await getApp(env)
+    } catch (error) {
+      const detail = errorMessage(error)
+      console.error('Worker startup failed.', error)
+      return jsonError(500, 'WORKER_STARTUP_FAILED', detail)
+    }
 
     const url = new URL(request.url)
     const headers = Object.fromEntries(request.headers.entries())
@@ -51,11 +81,17 @@ export default {
       injectOptions.payload = Buffer.from(await request.arrayBuffer())
     }
 
-    const response = await app.inject(injectOptions)
+    try {
+      const response = await app.inject(injectOptions)
 
-    return new Response(response.payload, {
-      status: response.statusCode,
-      headers: response.headers as HeadersInit
-    })
+      return new Response(response.payload, {
+        status: response.statusCode,
+        headers: response.headers as HeadersInit
+      })
+    } catch (error) {
+      const detail = errorMessage(error)
+      console.error('Worker request handling failed.', error)
+      return jsonError(500, 'WORKER_REQUEST_FAILED', detail)
+    }
   }
 }
