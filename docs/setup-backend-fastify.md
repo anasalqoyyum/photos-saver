@@ -37,6 +37,18 @@ In `backend/wrangler.toml`, set real IDs for:
 
 Apply D1 migrations from `backend/migrations/`.
 
+Build the Cloudflare Worker bundle before deploy:
+
+```bash
+pnpm backend:build
+```
+
+Deploy to Cloudflare Workers:
+
+```bash
+pnpm backend:deploy
+```
+
 ## 3) Configure extension backend mode
 
 Edit `src/backend-config.ts`:

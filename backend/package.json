@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "build": "pnpm dlx wrangler deploy --dry-run",
+    "deploy": "pnpm dlx wrangler deploy",
     "typecheck": "tsc --noEmit",
     "test": "node --test --import tsx tests/**/*.test.ts"
   },

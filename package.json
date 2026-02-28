@@ -9,6 +9,8 @@
     "typecheck": "tsc --noEmit",
     "test": "node --test --import tsx tests/**/*.test.ts",
     "backend:dev": "pnpm --filter photos-saver-backend dev",
+    "backend:build": "pnpm --filter photos-saver-backend run build",
+    "backend:deploy": "pnpm --filter photos-saver-backend run deploy",
     "backend:typecheck": "pnpm --filter photos-saver-backend typecheck",
     "backend:test": "pnpm --filter photos-saver-backend test"
   },

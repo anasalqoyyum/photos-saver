@@ -51,6 +51,18 @@ wrangler d1 migrations apply photos-saver-backend --local
 wrangler d1 migrations apply photos-saver-backend --remote
 ```
 
+Build the Cloudflare Worker bundle (dry run):
+
+```bash
+pnpm backend:build
+```
+
+Deploy to Cloudflare Workers:
+
+```bash
+pnpm backend:deploy
+```
+
 Generate encryption key (example):
 
 ```bash
