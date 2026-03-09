@@ -55,6 +55,7 @@ Configure bindings in `backend/wrangler.toml`:
 
 - KV binding `AUTH_KV` for session tokens.
 - D1 binding `APP_DB` for encrypted Google refresh-token records and one-time auth artifacts.
+- The repo root includes `.wrangler/deploy/config.json` so Cloudflare deploys run from the monorepo root still load this backend config.
 
 Apply migrations:
 

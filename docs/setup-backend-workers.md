@@ -32,6 +32,7 @@ In `backend/wrangler.toml`, set real IDs for:
 
 - `AUTH_KV` (KV namespace)
 - `APP_DB` (D1 database)
+- The repo root includes `.wrangler/deploy/config.json` so `wrangler deploy` or `wrangler versions upload` executed from the monorepo root still resolve this backend config.
 
 Apply D1 migrations from `backend/migrations/`:
 
