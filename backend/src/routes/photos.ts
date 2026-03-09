@@ -18,7 +18,6 @@ export interface PhotosRoutesOptions {
   googleTokenStore: GoogleTokenStore
 }
 
-const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
 const MAX_FILENAME_LENGTH = 255
 const MAX_SOURCE_URL_LENGTH = 4096
 const MAX_CONTENT_TYPE_LENGTH = 255
@@ -109,7 +108,7 @@ function validateUploadBody(
 }
 
 function base64ToBytes(base64: string): Uint8Array | null {
-  if (!BASE64_PATTERN.test(base64)) {
+  if (!isValidBase64(base64)) {
     return null
   }
 
@@ -118,6 +117,45 @@ function base64ToBytes(base64: string): Uint8Array | null {
   } catch {
     return null
   }
+}
+
+function isBase64Char(code: number): boolean {
+  return (
+    (code >= 65 && code <= 90) ||
+    (code >= 97 && code <= 122) ||
+    (code >= 48 && code <= 57) ||
+    code === 43 ||
+    code === 47
+  )
+}
+
+function isValidBase64(value: string): boolean {
+  const length = value.length
+  if (length === 0 || length % 4 !== 0) {
+    return false
+  }
+
+  let payloadLength = length
+  if (value[length - 1] === '=') {
+    payloadLength -= 1
+    if (value[length - 2] === '=') {
+      payloadLength -= 1
+    }
+  }
+
+  for (let index = 0; index < payloadLength; index += 1) {
+    if (!isBase64Char(value.charCodeAt(index))) {
+      return false
+    }
+  }
+
+  for (let index = payloadLength; index < length; index += 1) {
+    if (value[index] !== '=') {
+      return false
+    }
+  }
+
+  return true
 }
 
 function isHttpUrl(value: string): boolean {
