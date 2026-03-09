@@ -4,15 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "pnpm dlx wrangler dev",
     "build": "pnpm dlx wrangler deploy --dry-run",
     "deploy": "pnpm dlx wrangler deploy",
     "typecheck": "tsc --noEmit",
     "test": "node --test --import tsx tests/**/*.test.ts"
   },
   "dependencies": {
-    "dotenv": "^17.3.1",
-    "fastify": "^5.6.1"
+    "hono": "^4.10.6"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",

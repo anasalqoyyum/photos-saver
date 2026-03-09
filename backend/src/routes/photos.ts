@@ -1,7 +1,6 @@
-import { FastifyInstance } from 'fastify'
-
+import { base64ToBytes as decodeBase64ToBytes } from '../base64.js'
 import { AppConfig } from '../config.js'
-import { parseBearerToken } from '../http.js'
+import { errorResponse, jsonResponse, parseBearerToken, readJsonBody } from '../http.js'
 import { uploadImageToGooglePhotos } from '../services/google-photos.js'
 import { refreshGoogleAccessToken } from '../services/google-oauth.js'
 import { GoogleTokenStore, SessionStore } from '../store.js'
@@ -13,7 +12,7 @@ interface UploadRequestBody {
   contentType: string | null
 }
 
-interface PhotosRoutesOptions {
+export interface PhotosRoutesOptions {
   config: AppConfig
   sessionStore: SessionStore
   googleTokenStore: GoogleTokenStore
@@ -113,7 +112,11 @@ function base64ToBytes(base64: string): Uint8Array | null {
     return null
   }
 
-  return Uint8Array.from(Buffer.from(base64, 'base64'))
+  try {
+    return decodeBase64ToBytes(base64)
+  } catch {
+    return null
+  }
 }
 
 function isHttpUrl(value: string): boolean {
@@ -125,96 +128,108 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
-export async function registerPhotosRoutes(
-  app: FastifyInstance,
+function parseContentLength(value: string | null): number | null {
+  if (!value) {
+    return null
+  }
+
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return null
+  }
+
+  return parsed
+}
+
+export async function handlePhotoUpload(
+  request: Request,
   options: PhotosRoutesOptions
-): Promise<void> {
-  app.post<{ Body: UploadRequestBody }>(
-    '/v1/photos/upload',
-    async (request, reply) => {
-      const bearerToken = parseBearerToken(request.headers.authorization)
-      if (!bearerToken) {
-        return reply.code(401).send({ error: 'MISSING_AUTHORIZATION' })
-      }
+): Promise<Response> {
+  const bearerToken = parseBearerToken(request.headers.get('authorization') || undefined)
+  if (!bearerToken) {
+    return errorResponse(401, 'MISSING_AUTHORIZATION')
+  }
 
-      const session = await options.sessionStore.get(bearerToken)
-      if (!session) {
-        return reply.code(401).send({ error: 'INVALID_OR_EXPIRED_SESSION' })
-      }
+  const session = await options.sessionStore.get(bearerToken)
+  if (!session) {
+    return errorResponse(401, 'INVALID_OR_EXPIRED_SESSION')
+  }
 
-      const validated = validateUploadBody(request.body, options.config.maxUploadBytes)
-      if (!validated.ok) {
-        if (validated.error === 'IMAGE_PAYLOAD_TOO_LARGE') {
-          return reply.code(413).send({
-            error: 'IMAGE_TOO_LARGE',
-            maxBytes: options.config.maxUploadBytes
-          })
-        }
+  const contentLength = parseContentLength(request.headers.get('content-length'))
+  if (contentLength !== null && contentLength > options.config.maxUploadBytes * 2) {
+    return errorResponse(413, 'IMAGE_TOO_LARGE', {
+      maxBytes: options.config.maxUploadBytes
+    })
+  }
 
-        return reply.code(400).send({ error: validated.error })
-      }
-
-      const { fileName, sourceUrl, imageBase64, contentType } = validated.value
-
-      if (!isHttpUrl(sourceUrl)) {
-        return reply.code(400).send({ error: 'INVALID_SOURCE_URL' })
-      }
-
-      const bytes = base64ToBytes(imageBase64)
-      if (!bytes) {
-        return reply.code(400).send({ error: 'INVALID_IMAGE_BASE64' })
-      }
-
-      if (bytes.byteLength === 0) {
-        return reply.code(400).send({ error: 'EMPTY_IMAGE_PAYLOAD' })
-      }
-
-      if (bytes.byteLength > options.config.maxUploadBytes) {
-        return reply.code(413).send({
-          error: 'IMAGE_TOO_LARGE',
-          maxBytes: options.config.maxUploadBytes
-        })
-      }
-
-      const storedGoogleToken = await options.googleTokenStore.getByUserId(
-        session.userId
-      )
-      if (!storedGoogleToken) {
-        return reply.code(401).send({ error: 'USER_NOT_LINKED_TO_GOOGLE' })
-      }
-
-      const refreshed = await refreshGoogleAccessToken({
-        config: options.config,
-        refreshToken: storedGoogleToken.refreshToken
+  const body = await readJsonBody(request)
+  const validated = validateUploadBody(body, options.config.maxUploadBytes)
+  if (!validated.ok) {
+    if (validated.error === 'IMAGE_PAYLOAD_TOO_LARGE') {
+      return errorResponse(413, 'IMAGE_TOO_LARGE', {
+        maxBytes: options.config.maxUploadBytes
       })
-
-      const accessToken = refreshed.access_token
-      if (!accessToken) {
-        return reply.code(502).send({ error: 'GOOGLE_REFRESH_RETURNED_NO_ACCESS_TOKEN' })
-      }
-
-      if (refreshed.refresh_token) {
-        await options.googleTokenStore.upsert({
-          ...storedGoogleToken,
-          refreshToken: refreshed.refresh_token,
-          ...(refreshed.scope ? { scope: refreshed.scope } : {}),
-          updatedAt: Date.now()
-        })
-      }
-
-      const uploadResult = await uploadImageToGooglePhotos({
-        accessToken,
-        bytes,
-        fileName,
-        contentType,
-        sourceUrl
-      })
-
-      return {
-        status: 'ok',
-        fileName,
-        mediaItemId: uploadResult.mediaItemId
-      }
     }
-  )
+
+    return errorResponse(400, validated.error)
+  }
+
+  const { fileName, sourceUrl, imageBase64, contentType } = validated.value
+
+  if (!isHttpUrl(sourceUrl)) {
+    return errorResponse(400, 'INVALID_SOURCE_URL')
+  }
+
+  const bytes = base64ToBytes(imageBase64)
+  if (!bytes) {
+    return errorResponse(400, 'INVALID_IMAGE_BASE64')
+  }
+
+  if (bytes.byteLength === 0) {
+    return errorResponse(400, 'EMPTY_IMAGE_PAYLOAD')
+  }
+
+  if (bytes.byteLength > options.config.maxUploadBytes) {
+    return errorResponse(413, 'IMAGE_TOO_LARGE', {
+      maxBytes: options.config.maxUploadBytes
+    })
+  }
+
+  const storedGoogleToken = await options.googleTokenStore.getByUserId(session.userId)
+  if (!storedGoogleToken) {
+    return errorResponse(401, 'USER_NOT_LINKED_TO_GOOGLE')
+  }
+
+  const refreshed = await refreshGoogleAccessToken({
+    config: options.config,
+    refreshToken: storedGoogleToken.refreshToken
+  })
+
+  const accessToken = refreshed.access_token
+  if (!accessToken) {
+    return errorResponse(502, 'GOOGLE_REFRESH_RETURNED_NO_ACCESS_TOKEN')
+  }
+
+  if (refreshed.refresh_token) {
+    await options.googleTokenStore.upsert({
+      ...storedGoogleToken,
+      refreshToken: refreshed.refresh_token,
+      ...(refreshed.scope ? { scope: refreshed.scope } : {}),
+      updatedAt: Date.now()
+    })
+  }
+
+  const uploadResult = await uploadImageToGooglePhotos({
+    accessToken,
+    bytes,
+    fileName,
+    contentType,
+    sourceUrl
+  })
+
+  return jsonResponse({
+    status: 'ok',
+    fileName,
+    mediaItemId: uploadResult.mediaItemId
+  })
 }

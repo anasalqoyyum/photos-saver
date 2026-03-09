@@ -1,16 +1,4 @@
-function toBase64Url(bytes: Uint8Array): string {
-  return Buffer.from(bytes)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/g, '')
-}
-
-function fromBase64Url(value: string): Uint8Array {
-  const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
-  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
-  return new Uint8Array(Buffer.from(padded, 'base64'))
-}
+import { base64UrlToBytes, bytesToBase64Url } from './base64.js'
 
 function decodeKeyMaterial(value: string): Uint8Array {
   const trimmed = value.trim()
@@ -18,7 +6,7 @@ function decodeKeyMaterial(value: string): Uint8Array {
     throw new Error('TOKEN_ENCRYPTION_KEY is empty.')
   }
 
-  const decoded = fromBase64Url(trimmed)
+  const decoded = base64UrlToBytes(trimmed)
   if (decoded.byteLength === 0) {
     throw new Error('TOKEN_ENCRYPTION_KEY could not be decoded.')
   }
@@ -66,7 +54,7 @@ export class TokenCipher {
       encoded
     )
 
-    return `${toBase64Url(iv)}.${toBase64Url(new Uint8Array(ciphertext))}`
+    return `${bytesToBase64Url(iv)}.${bytesToBase64Url(new Uint8Array(ciphertext))}`
   }
 
   async decrypt(payload: string): Promise<string> {
@@ -75,8 +63,8 @@ export class TokenCipher {
       throw new Error('Encrypted payload has invalid format.')
     }
 
-    const iv = Uint8Array.from(fromBase64Url(ivPart))
-    const data = Uint8Array.from(fromBase64Url(dataPart))
+    const iv = Uint8Array.from(base64UrlToBytes(ivPart))
+    const data = Uint8Array.from(base64UrlToBytes(dataPart))
     const plaintext = await crypto.subtle.decrypt(
       {
         name: 'AES-GCM',

@@ -33,8 +33,16 @@ function parseNumber(value: string | undefined, fallback: number): number {
   return parsed
 }
 
+function defaultEnv(): Record<string, string | undefined> {
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env
+  }
+
+  return {}
+}
+
 export function loadConfig(
-  env: Record<string, string | undefined> = process.env
+  env: Record<string, string | undefined> = defaultEnv()
 ): AppConfig {
   const scopeString =
     env.GOOGLE_SCOPES ||
