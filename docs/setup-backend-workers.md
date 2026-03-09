@@ -21,6 +21,7 @@ Set these variables for the Worker:
 - `GOOGLE_OAUTH_REDIRECT_URI` (must match Google OAuth config exactly)
 - `TOKEN_ENCRYPTION_KEY` (base64/base64url 32-byte key)
 - Optional: `GOOGLE_SCOPES`
+- Optional: `GOOGLE_OAUTH_FORCE_CONSENT` (`true` to force Google consent screen every auth)
 - Optional: `CORS_ORIGIN`
 - Optional: `ALLOWED_GOOGLE_USER_ID` (single-user lock)
 

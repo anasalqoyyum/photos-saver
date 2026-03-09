@@ -3,6 +3,7 @@ export interface AppConfig {
   googleClientSecret: string
   googleOauthRedirectUri: string
   googleScopes: string[]
+  googleOauthForceConsent: boolean
   allowedGoogleUserId?: string
   tokenEncryptionKey?: string
   corsOrigin?: string
@@ -33,6 +34,23 @@ function parseNumber(value: string | undefined, fallback: number): number {
   return parsed
 }
 
+function parseBoolean(value: string | undefined, fallback: boolean): boolean {
+  if (!value) {
+    return fallback
+  }
+
+  const normalized = value.trim().toLowerCase()
+  if (normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on') {
+    return true
+  }
+
+  if (normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off') {
+    return false
+  }
+
+  return fallback
+}
+
 function defaultEnv(): Record<string, string | undefined> {
   if (typeof process !== 'undefined' && process.env) {
     return process.env
@@ -61,6 +79,7 @@ export function loadConfig(
       'GOOGLE_OAUTH_REDIRECT_URI'
     ),
     googleScopes,
+    googleOauthForceConsent: parseBoolean(env.GOOGLE_OAUTH_FORCE_CONSENT, false),
     ...(env.ALLOWED_GOOGLE_USER_ID
       ? { allowedGoogleUserId: env.ALLOWED_GOOGLE_USER_ID.trim() }
       : {}),

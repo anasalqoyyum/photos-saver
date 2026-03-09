@@ -38,7 +38,9 @@ export function buildGoogleAuthUrl(params: {
   url.searchParams.set('scope', params.config.googleScopes.join(' '))
   url.searchParams.set('state', params.state)
   url.searchParams.set('access_type', 'offline')
-  url.searchParams.set('prompt', 'consent')
+  if (params.config.googleOauthForceConsent) {
+    url.searchParams.set('prompt', 'consent')
+  }
   url.searchParams.set('include_granted_scopes', 'true')
   return url.toString()
 }

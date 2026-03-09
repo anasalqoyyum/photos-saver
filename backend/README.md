@@ -9,6 +9,7 @@ Worker-native Hono backend for OAuth and Google Photos uploads.
 - `GOOGLE_OAUTH_REDIRECT_URI` - callback URL (`https://<backend-host>/v1/auth/callback`)
 - `TOKEN_ENCRYPTION_KEY` - base64/base64url 32-byte key for refresh-token encryption at rest
 - `GOOGLE_SCOPES` (optional)
+- `GOOGLE_OAUTH_FORCE_CONSENT` (optional; defaults to `false`)
 - `CORS_ORIGIN` (optional; defaults to `chrome-extension://<id>` and localhost origins)
 - `ALLOWED_GOOGLE_USER_ID` (optional, recommended for single-user mode)
 - `SESSION_TTL_MS` (optional)
