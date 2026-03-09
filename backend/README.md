@@ -24,6 +24,7 @@ Worker-native Hono backend for OAuth and Google Photos uploads.
 - `POST /v1/auth/start`
 - `GET /v1/auth/callback`
 - `POST /v1/auth/exchange`
+- `POST /v1/auth/refresh`
 - `POST /v1/auth/logout`
 - `POST /v1/photos/upload`
 

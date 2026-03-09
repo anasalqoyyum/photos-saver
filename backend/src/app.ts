@@ -7,6 +7,7 @@ import {
   AuthRoutesOptions,
   handleAuthCallback,
   handleAuthExchange,
+  handleAuthRefresh,
   handleAuthLogout,
   handleAuthStart
 } from './routes/auth.js'
@@ -147,6 +148,7 @@ export async function buildApp(
   app.post('/v1/auth/start', c => handleAuthStart(c.req.raw, authOptions))
   app.get('/v1/auth/callback', c => handleAuthCallback(c.req.raw, authOptions))
   app.post('/v1/auth/exchange', c => handleAuthExchange(c.req.raw, authOptions))
+  app.post('/v1/auth/refresh', c => handleAuthRefresh(c.req.raw, authOptions))
   app.post('/v1/auth/logout', c => handleAuthLogout(c.req.raw, authOptions))
   app.post('/v1/photos/upload', c => handlePhotoUpload(c.req.raw, photosOptions))
 

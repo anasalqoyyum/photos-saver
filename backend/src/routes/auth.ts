@@ -180,6 +180,32 @@ export async function handleAuthExchange(
   })
 }
 
+export async function handleAuthRefresh(
+  request: Request,
+  options: AuthRoutesOptions
+): Promise<Response> {
+  const token = parseBearerToken(request.headers.get('authorization') || undefined)
+  if (!token) {
+    return errorResponse(401, 'MISSING_AUTHORIZATION')
+  }
+
+  const existingSession = await options.sessionStore.get(token)
+  if (!existingSession) {
+    return errorResponse(401, 'INVALID_OR_EXPIRED_SESSION')
+  }
+
+  const refreshedSession = await options.sessionStore.create(
+    existingSession.userId,
+    options.config.sessionTtlMs
+  )
+  await options.sessionStore.revoke(token)
+
+  return jsonResponse({
+    sessionToken: refreshedSession.token,
+    expiresAt: refreshedSession.expiresAt
+  })
+}
+
 export async function handleAuthLogout(
   request: Request,
   options: AuthRoutesOptions

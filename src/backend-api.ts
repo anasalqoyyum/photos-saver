@@ -126,12 +126,6 @@ async function loadBackendSessionFromStorage(): Promise<void> {
       return
     }
 
-    if (!shouldReuseSession(storedValue)) {
-      await persistBackendSession(null)
-      hasLoadedBackendSession = true
-      return
-    }
-
     backendSession = storedValue
     hasLoadedBackendSession = true
 
@@ -144,6 +138,41 @@ async function loadBackendSessionFromStorage(): Promise<void> {
     await loadBackendSessionPromise
   } finally {
     loadBackendSessionPromise = null
+  }
+}
+
+async function refreshBackendSessionToken(session: BackendSession): Promise<BackendSession | null> {
+  const backendBaseUrl = getBackendBaseUrl()
+  const response = await fetch(`${backendBaseUrl}/v1/auth/refresh`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${session.token}`
+    }
+  })
+
+  if (response.status === 401) {
+    return null
+  }
+
+  if (!response.ok) {
+    throw new ExtensionError(
+      'AUTH_FAILED',
+      `Backend auth refresh failed with status ${response.status}.`
+    )
+  }
+
+  const payload = (await response.json()) as {
+    sessionToken?: string
+    expiresAt?: number
+  }
+
+  if (!payload.sessionToken || typeof payload.expiresAt !== 'number') {
+    throw new ExtensionError('AUTH_FAILED', 'Backend auth refresh returned invalid payload.')
+  }
+
+  return {
+    token: payload.sessionToken,
+    expiresAt: payload.expiresAt
   }
 }
 
@@ -204,6 +233,24 @@ async function ensureBackendSessionToken(): Promise<string> {
   }
 
   if (existingSession) {
+    try {
+      const refreshedSession = await refreshBackendSessionToken(existingSession)
+      if (refreshedSession) {
+        backendSession = refreshedSession
+        await persistBackendSession(refreshedSession)
+
+        debug('Backend auth session refreshed without Google OAuth prompt.', {
+          expiresAt: refreshedSession.expiresAt
+        })
+
+        return refreshedSession.token
+      }
+    } catch (error) {
+      warn('Backend session refresh failed; falling back to full auth flow.', {
+        message: error instanceof Error ? error.message : 'Unknown error'
+      })
+    }
+
     backendSession = null
     await persistBackendSession(null)
   }
