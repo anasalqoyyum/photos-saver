@@ -19,3 +19,7 @@ binding = "APP_DB"
 database_name = "APP_DB"
 database_id = "11cdf975-13b9-4bfa-846b-7e5f47616687"
 migrations_dir = "migrations"
+
+[[routes]]
+pattern = "photos-saver.anasalqoyyum.dev"
+custom_domain = true
