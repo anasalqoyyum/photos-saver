@@ -7,7 +7,7 @@ enabled = true
 
 [vars]
 GOOGLE_CLIENT_ID = "478240865692-hqht6c29pg3lspglq2hbtc95djiakj7u.apps.googleusercontent.com"
-GOOGLE_OAUTH_REDIRECT_URI = "https://photos-saver.anas-alqoyyum.workers.dev/v1/auth/callback"
+GOOGLE_OAUTH_REDIRECT_URI = "https://photos-saver.anasalqoyyum.dev/v1/auth/callback"
 CORS_ORIGIN = "*"
 
 [[kv_namespaces]]
