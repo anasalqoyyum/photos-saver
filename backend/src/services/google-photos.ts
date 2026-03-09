@@ -2,6 +2,57 @@ const PHOTOS_UPLOADS_URL = 'https://photoslibrary.googleapis.com/v1/uploads'
 const PHOTOS_BATCH_CREATE_URL =
   'https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate'
 
+export class GooglePhotosApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly detail?: string
+  ) {
+    super(message)
+    this.name = 'GooglePhotosApiError'
+  }
+}
+
+function parseJsonDetail(payload: unknown): string | null {
+  if (typeof payload !== 'object' || payload === null) {
+    return null
+  }
+
+  const googleError = (payload as { error?: { message?: unknown } }).error
+  if (typeof googleError?.message === 'string' && googleError.message.trim()) {
+    return googleError.message.trim()
+  }
+
+  const message = (payload as { message?: unknown }).message
+  if (typeof message === 'string' && message.trim()) {
+    return message.trim()
+  }
+
+  return null
+}
+
+async function readErrorDetail(response: Response): Promise<string | undefined> {
+  const contentType = response.headers.get('content-type') || ''
+  const rawText = (await response.text()).trim()
+  if (!rawText) {
+    return undefined
+  }
+
+  if (contentType.includes('application/json')) {
+    try {
+      const parsed = JSON.parse(rawText) as unknown
+      const detail = parseJsonDetail(parsed)
+      if (detail) {
+        return detail
+      }
+    } catch {
+      return rawText.slice(0, 300)
+    }
+  }
+
+  return rawText.slice(0, 300)
+}
+
 function asContentType(value: string | null): string {
   if (!value) {
     return 'application/octet-stream'
@@ -31,7 +82,12 @@ async function uploadRawBytes(params: {
   })
 
   if (!response.ok) {
-    throw new Error(`Google Photos byte upload failed (${response.status}).`)
+    const detail = await readErrorDetail(response)
+    throw new GooglePhotosApiError(
+      `Google Photos byte upload failed (${response.status})${detail ? `: ${detail}` : '.'}`,
+      response.status,
+      detail
+    )
   }
 
   const token = (await response.text()).trim()
@@ -68,7 +124,12 @@ async function createMediaItem(params: {
   })
 
   if (!response.ok) {
-    throw new Error(`Google Photos media item create failed (${response.status}).`)
+    const detail = await readErrorDetail(response)
+    throw new GooglePhotosApiError(
+      `Google Photos media item create failed (${response.status})${detail ? `: ${detail}` : '.'}`,
+      response.status,
+      detail
+    )
   }
 
   const payload = (await response.json()) as {

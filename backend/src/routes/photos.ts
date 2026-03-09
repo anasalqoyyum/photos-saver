@@ -1,7 +1,7 @@
 import { base64ToBytes as decodeBase64ToBytes } from '../base64.js'
 import { AppConfig } from '../config.js'
 import { errorResponse, jsonResponse, parseBearerToken, readJsonBody } from '../http.js'
-import { uploadImageToGooglePhotos } from '../services/google-photos.js'
+import { GooglePhotosApiError, uploadImageToGooglePhotos } from '../services/google-photos.js'
 import { refreshGoogleAccessToken } from '../services/google-oauth.js'
 import { GoogleTokenStore, SessionStore } from '../store.js'
 
@@ -22,6 +22,7 @@ const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/
 const MAX_FILENAME_LENGTH = 255
 const MAX_SOURCE_URL_LENGTH = 4096
 const MAX_CONTENT_TYPE_LENGTH = 255
+const GOOGLE_PHOTOS_APPENDONLY_SCOPE = 'https://www.googleapis.com/auth/photoslibrary.appendonly'
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -141,6 +142,18 @@ function parseContentLength(value: string | null): number | null {
   return parsed
 }
 
+function hasGoogleScope(scopeList: string | undefined, requiredScope: string): boolean {
+  if (!scopeList) {
+    return false
+  }
+
+  return scopeList
+    .split(' ')
+    .map(scope => scope.trim())
+    .filter(Boolean)
+    .includes(requiredScope)
+}
+
 export async function handlePhotoUpload(
   request: Request,
   options: PhotosRoutesOptions
@@ -200,6 +213,18 @@ export async function handlePhotoUpload(
     return errorResponse(401, 'USER_NOT_LINKED_TO_GOOGLE')
   }
 
+  if (
+    storedGoogleToken.scope &&
+    !hasGoogleScope(storedGoogleToken.scope, GOOGLE_PHOTOS_APPENDONLY_SCOPE)
+  ) {
+    return errorResponse(403, 'GOOGLE_SCOPE_MISSING', {
+      detail:
+        'Stored Google authorization is missing Google Photos append scope. Re-link the backend Google account.',
+      grantedScope: storedGoogleToken.scope,
+      requiredScope: GOOGLE_PHOTOS_APPENDONLY_SCOPE
+    })
+  }
+
   const refreshed = await refreshGoogleAccessToken({
     config: options.config,
     refreshToken: storedGoogleToken.refreshToken
@@ -219,17 +244,37 @@ export async function handlePhotoUpload(
     })
   }
 
-  const uploadResult = await uploadImageToGooglePhotos({
-    accessToken,
-    bytes,
-    fileName,
-    contentType,
-    sourceUrl
-  })
+  if (refreshed.scope && !hasGoogleScope(refreshed.scope, GOOGLE_PHOTOS_APPENDONLY_SCOPE)) {
+    return errorResponse(403, 'GOOGLE_SCOPE_MISSING', {
+      detail:
+        'Refreshed Google access token is missing Google Photos append scope. Re-link the backend Google account.',
+      grantedScope: refreshed.scope,
+      requiredScope: GOOGLE_PHOTOS_APPENDONLY_SCOPE
+    })
+  }
 
-  return jsonResponse({
-    status: 'ok',
-    fileName,
-    mediaItemId: uploadResult.mediaItemId
-  })
+  try {
+    const uploadResult = await uploadImageToGooglePhotos({
+      accessToken,
+      bytes,
+      fileName,
+      contentType,
+      sourceUrl
+    })
+
+    return jsonResponse({
+      status: 'ok',
+      fileName,
+      mediaItemId: uploadResult.mediaItemId
+    })
+  } catch (error) {
+    if (error instanceof GooglePhotosApiError) {
+      return errorResponse(502, 'GOOGLE_PHOTOS_UPLOAD_FAILED', {
+        detail: error.detail || error.message,
+        googleStatus: error.status
+      })
+    }
+
+    throw error
+  }
 }
