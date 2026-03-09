@@ -1,13 +1,21 @@
-import Fastify, { FastifyInstance } from 'fastify'
+import { Hono } from 'hono'
+import { cors } from 'hono/cors'
 
 import { AppConfig, loadConfig } from './config.js'
-import { registerAuthRoutes } from './routes/auth.js'
-import { registerPhotosRoutes } from './routes/photos.js'
+import { errorResponse, jsonResponse } from './http.js'
+import {
+  AuthRoutesOptions,
+  handleAuthCallback,
+  handleAuthExchange,
+  handleAuthLogout,
+  handleAuthStart
+} from './routes/auth.js'
+import { handlePhotoUpload, PhotosRoutesOptions } from './routes/photos.js'
 import { createStoresForRuntime } from './store-factory.js'
 import { WorkerBindings } from './worker-bindings.js'
 
-interface BuildAppOptions {
-  logger?: boolean
+export interface WorkerApp {
+  fetch(request: Request): Promise<Response>
 }
 
 type CorsOriginConfig = true | string | Array<string | RegExp>
@@ -23,9 +31,7 @@ function defaultCorsOrigins(): RegExp[] {
   return [...LOCAL_ORIGIN_PATTERNS, EXTENSION_ORIGIN_PATTERN]
 }
 
-function parseCorsOrigin(
-  corsOrigin: string | undefined
-): CorsOriginConfig {
+function parseCorsOrigin(corsOrigin: string | undefined): CorsOriginConfig {
   if (!corsOrigin) {
     return defaultCorsOrigins()
   }
@@ -73,75 +79,87 @@ function isOriginAllowed(origin: string, config: CorsOriginConfig): boolean {
   })
 }
 
-function registerCorsHooks(app: FastifyInstance, corsConfig: CorsOriginConfig): void {
-  app.addHook('onRequest', async (request, reply) => {
-    const originHeader = request.headers.origin
-    const method = request.method
+function corsOriginValue(origin: string, config: CorsOriginConfig): string | undefined {
+  if (!origin) {
+    return config === true ? '*' : undefined
+  }
 
-    let allowOrigin: string | null = null
-    if (originHeader) {
-      if (isOriginAllowed(originHeader, corsConfig)) {
-        allowOrigin = corsConfig === true ? '*' : originHeader
-      }
-    } else if (corsConfig === true) {
-      allowOrigin = '*'
-    }
+  if (!isOriginAllowed(origin, config)) {
+    return undefined
+  }
 
-    if (allowOrigin) {
-      reply.header('Access-Control-Allow-Origin', allowOrigin)
-      if (allowOrigin !== '*') {
-        reply.header('Vary', 'Origin')
-      }
-    }
-
-    if (method !== 'OPTIONS') {
-      return
-    }
-
-    if (originHeader && !allowOrigin) {
-      return reply.code(403).send({ error: 'CORS_ORIGIN_NOT_ALLOWED' })
-    }
-
-    reply.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    reply.header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-    reply.header('Access-Control-Max-Age', '86400')
-    return reply.code(204).send()
-  })
+  return config === true ? '*' : origin
 }
 
 export async function buildApp(
   config: AppConfig = loadConfig(),
-  bindings?: WorkerBindings,
-  options: BuildAppOptions = {}
-): Promise<FastifyInstance> {
-  const app = Fastify({
-    logger: options.logger ?? true,
-    bodyLimit: config.maxUploadBytes * 2
-  })
-
-  registerCorsHooks(app, parseCorsOrigin(config.corsOrigin))
-
+  bindings?: WorkerBindings
+): Promise<WorkerApp> {
   const stores = await createStoresForRuntime(config, bindings)
+  const corsConfig = parseCorsOrigin(config.corsOrigin)
 
-  await registerAuthRoutes(app, {
+  const authOptions: AuthRoutesOptions = {
     config,
     authStateStore: stores.authStateStore,
     exchangeCodeStore: stores.exchangeCodeStore,
     sessionStore: stores.sessionStore,
     googleTokenStore: stores.googleTokenStore
-  })
+  }
 
-  await registerPhotosRoutes(app, {
+  const photosOptions: PhotosRoutesOptions = {
     config,
     sessionStore: stores.sessionStore,
     googleTokenStore: stores.googleTokenStore
-  })
+  }
 
-  app.get('/health', async () => {
-    return {
-      status: 'ok'
+  const app = new Hono()
+
+  app.use('*', async (c, next) => {
+    const origin = c.req.header('origin')
+    if (c.req.method === 'OPTIONS' && origin && !isOriginAllowed(origin, corsConfig)) {
+      return errorResponse(403, 'CORS_ORIGIN_NOT_ALLOWED')
     }
+
+    await next()
   })
 
-  return app
+  app.use(
+    '*',
+    cors({
+      origin: origin => corsOriginValue(origin, corsConfig),
+      allowMethods: ['GET', 'POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization'],
+      maxAge: 86400
+    })
+  )
+
+  app.get('/health', () => {
+    return jsonResponse({
+      status: 'ok'
+    })
+  })
+
+  app.get('/v1/health', () => {
+    return jsonResponse({
+      status: 'ok'
+    })
+  })
+  app.post('/v1/auth/start', c => handleAuthStart(c.req.raw, authOptions))
+  app.get('/v1/auth/callback', c => handleAuthCallback(c.req.raw, authOptions))
+  app.post('/v1/auth/exchange', c => handleAuthExchange(c.req.raw, authOptions))
+  app.post('/v1/auth/logout', c => handleAuthLogout(c.req.raw, authOptions))
+  app.post('/v1/photos/upload', c => handlePhotoUpload(c.req.raw, photosOptions))
+
+  app.notFound(() => errorResponse(404, 'NOT_FOUND'))
+
+  app.onError(error => {
+    console.error('Backend request failed.', error)
+    return errorResponse(500, 'INTERNAL_SERVER_ERROR')
+  })
+
+  return {
+    async fetch(request: Request): Promise<Response> {
+      return app.fetch(request)
+    }
+  }
 }

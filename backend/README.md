@@ -1,12 +1,12 @@
-# Photos Saver Backend (Fastify)
+# Photos Saver Backend (Cloudflare Worker + Hono)
 
-Fastify backend for OAuth and Google Photos uploads.
+Worker-native Hono backend for OAuth and Google Photos uploads.
 
 ## Environment variables
 
 - `GOOGLE_CLIENT_ID` - Google OAuth client ID
 - `GOOGLE_CLIENT_SECRET` - Google OAuth client secret
-- `GOOGLE_OAUTH_REDIRECT_URI` - backend callback URL (`https://<backend-host>/v1/auth/callback`)
+- `GOOGLE_OAUTH_REDIRECT_URI` - callback URL (`https://<backend-host>/v1/auth/callback`)
 - `TOKEN_ENCRYPTION_KEY` - base64/base64url 32-byte key for refresh-token encryption at rest
 - `GOOGLE_SCOPES` (optional)
 - `CORS_ORIGIN` (optional; defaults to `chrome-extension://<id>` and localhost origins)
@@ -18,6 +18,7 @@ Fastify backend for OAuth and Google Photos uploads.
 
 ## Routes
 
+- `GET /health`
 - `GET /v1/health`
 - `POST /v1/auth/start`
 - `GET /v1/auth/callback`
@@ -27,22 +28,34 @@ Fastify backend for OAuth and Google Photos uploads.
 
 ## Local development
 
-```bash
-pnpm --filter photos-saver-backend install
-cp backend/.env.example backend/.env
-pnpm --filter photos-saver-backend dev
-```
+1. Install deps:
 
-`src/server.ts` loads `backend/.env` automatically for local Node development.
+   ```bash
+   pnpm --filter photos-saver-backend install
+   ```
 
-## Cloudflare
+2. Copy `backend/.dev.vars.example` to `backend/.dev.vars`, then fill secrets:
 
-This repo includes `wrangler.toml` and a Workers `fetch` adapter (`src/worker.ts`) that routes requests into Fastify via `inject`.
+   ```bash
+   GOOGLE_CLIENT_ID=...
+   GOOGLE_CLIENT_SECRET=...
+   GOOGLE_OAUTH_REDIRECT_URI=http://127.0.0.1:8787/v1/auth/callback
+   TOKEN_ENCRYPTION_KEY=...
+   ```
 
-### Durable storage bindings
+3. Start local worker runtime:
+
+   ```bash
+   pnpm --filter photos-saver-backend dev
+   ```
+
+## Cloudflare bindings
+
+Configure bindings in `backend/wrangler.toml`:
 
 - KV binding `AUTH_KV` for session tokens.
 - D1 binding `APP_DB` for encrypted Google refresh-token records and one-time auth artifacts.
+- The repo root includes `.wrangler/deploy/config.json` so Cloudflare deploys run from the monorepo root still load this backend config.
 
 Apply migrations:
 
@@ -51,13 +64,13 @@ wrangler d1 migrations apply photos-saver-backend --local
 wrangler d1 migrations apply photos-saver-backend --remote
 ```
 
-Build the Cloudflare Worker bundle (dry run):
+Build the Worker bundle (dry run):
 
 ```bash
 pnpm backend:build
 ```
 
-Deploy to Cloudflare Workers:
+Deploy:
 
 ```bash
 pnpm backend:deploy
@@ -68,5 +81,3 @@ Generate encryption key (example):
 ```bash
 openssl rand -base64 32
 ```
-
-Before deploying, verify runtime behavior for your target plan and payload sizes.

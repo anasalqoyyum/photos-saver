@@ -97,4 +97,4 @@ If `key` is not set, Chrome can generate different IDs in different environments
   - In the Web OAuth client, add that exact URI under Authorized redirect URIs.
   - Ensure `<your-extension-id>` matches the runtime ID shown in service worker logs.
 
-If you switch to backend mode, use `docs/setup-backend-fastify.md` for backend OAuth setup.
+If you switch to backend mode, use `docs/setup-backend-workers.md` for Workers backend OAuth setup.

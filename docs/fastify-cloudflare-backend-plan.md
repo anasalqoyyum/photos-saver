@@ -1,4 +1,6 @@
-# Plan: Fastify Backend on Cloudflare for Google Photos Uploads
+# Historical Plan: Fastify Backend on Cloudflare for Google Photos Uploads
+
+This document is kept for context from the initial design phase. The current backend implementation is worker-native, Hono-based, and no longer uses Fastify.
 
 ## Goal
 

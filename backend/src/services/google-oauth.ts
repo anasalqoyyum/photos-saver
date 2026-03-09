@@ -1,4 +1,5 @@
 import { AppConfig } from '../config.js'
+import { base64UrlToBytes } from '../base64.js'
 import { GoogleTokenResponse } from '../types.js'
 
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
@@ -6,9 +7,8 @@ const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 
 function decodeBase64UrlJson<T>(payload: string): T | null {
   try {
-    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
-    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
-    const decoded = Buffer.from(padded, 'base64').toString('utf8')
+    const decodedBytes = base64UrlToBytes(payload)
+    const decoded = new TextDecoder().decode(decodedBytes)
     return JSON.parse(decoded) as T
   } catch {
     return null

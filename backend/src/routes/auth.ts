@@ -1,7 +1,12 @@
-import { FastifyInstance } from 'fastify'
-
 import { AppConfig } from '../config.js'
-import { parseBearerToken } from '../http.js'
+import {
+  emptyResponse,
+  errorResponse,
+  jsonResponse,
+  parseBearerToken,
+  readJsonBody,
+  redirectResponse
+} from '../http.js'
 import {
   AuthStateStore,
   ExchangeCodeStore,
@@ -14,12 +19,29 @@ import {
   extractGoogleUserId
 } from '../services/google-oauth.js'
 
-interface AuthRoutesOptions {
+export interface AuthRoutesOptions {
   config: AppConfig
   authStateStore: AuthStateStore
   exchangeCodeStore: ExchangeCodeStore
   sessionStore: SessionStore
   googleTokenStore: GoogleTokenStore
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function readStringField(body: unknown, key: string): string | null {
+  if (!isPlainObject(body)) {
+    return null
+  }
+
+  const value = body[key]
+  if (typeof value !== 'string') {
+    return null
+  }
+
+  return value
 }
 
 function isValidExtensionRedirectUri(uri: string): boolean {
@@ -37,151 +59,136 @@ function withParam(baseUrl: string, key: string, value: string): string {
   return url.toString()
 }
 
-export async function registerAuthRoutes(
-  app: FastifyInstance,
+export async function handleAuthStart(
+  request: Request,
   options: AuthRoutesOptions
-): Promise<void> {
-  app.post<{ Body: { extensionRedirectUri: string } }>(
-    '/v1/auth/start',
-    async (request, reply) => {
-      const extensionRedirectUri = request.body?.extensionRedirectUri?.trim()
-      if (!extensionRedirectUri || !isValidExtensionRedirectUri(extensionRedirectUri)) {
-        return reply.code(400).send({
-          error: 'INVALID_EXTENSION_REDIRECT_URI'
-        })
-      }
+): Promise<Response> {
+  const body = await readJsonBody(request)
+  const extensionRedirectUri = readStringField(body, 'extensionRedirectUri')?.trim()
 
-      const state = crypto.randomUUID()
-      const createdAt = Date.now()
-      await options.authStateStore.create({
-        state,
-        extensionRedirectUri,
-        createdAt,
-        expiresAt: createdAt + options.config.authStateTtlMs
-      })
+  if (!extensionRedirectUri || !isValidExtensionRedirectUri(extensionRedirectUri)) {
+    return errorResponse(400, 'INVALID_EXTENSION_REDIRECT_URI')
+  }
 
-      const authUrl = buildGoogleAuthUrl({
-        config: options.config,
-        state
-      })
-
-      return {
-        authUrl,
-        state
-      }
-    }
-  )
-
-  app.get<{
-    Querystring: {
-      code?: string
-      state?: string
-      error?: string
-      error_description?: string
-    }
-  }>('/v1/auth/callback', async (request, reply) => {
-    if (request.query.error) {
-      return reply.code(400).send({
-        error: 'OAUTH_PROVIDER_ERROR',
-        detail: request.query.error_description || request.query.error
-      })
-    }
-
-    const state = request.query.state || ''
-    const code = request.query.code || ''
-    if (!state || !code) {
-      return reply.code(400).send({
-        error: 'INVALID_CALLBACK_PARAMS'
-      })
-    }
-
-    const authState = await options.authStateStore.consume(state)
-    if (!authState) {
-      return reply.code(400).send({
-        error: 'INVALID_OR_EXPIRED_STATE'
-      })
-    }
-
-    const tokenPayload = await exchangeGoogleAuthCode({
-      config: options.config,
-      code
-    })
-
-    const userId = extractGoogleUserId(tokenPayload.id_token)
-    if (!userId) {
-      return reply.code(400).send({
-        error: 'MISSING_USER_ID_IN_ID_TOKEN'
-      })
-    }
-
-    if (options.config.allowedGoogleUserId && options.config.allowedGoogleUserId !== userId) {
-      return reply.code(403).send({
-        error: 'GOOGLE_USER_NOT_ALLOWED'
-      })
-    }
-
-    const existing = await options.googleTokenStore.getByUserId(userId)
-    const refreshToken = tokenPayload.refresh_token || existing?.refreshToken
-    if (!refreshToken) {
-      return reply.code(400).send({
-        error: 'MISSING_REFRESH_TOKEN',
-        detail: 'Google did not return refresh_token and no existing token is stored.'
-      })
-    }
-
-    await options.googleTokenStore.upsert({
-      userId,
-      refreshToken,
-      ...(tokenPayload.scope ? { scope: tokenPayload.scope } : {}),
-      updatedAt: Date.now()
-    })
-
-    const exchangeCode = await options.exchangeCodeStore.create(
-      userId,
-      options.config.exchangeCodeTtlMs
-    )
-
-    return reply.redirect(
-      withParam(authState.extensionRedirectUri, 'session_code', exchangeCode.code)
-    )
+  const state = crypto.randomUUID()
+  const createdAt = Date.now()
+  await options.authStateStore.create({
+    state,
+    extensionRedirectUri,
+    createdAt,
+    expiresAt: createdAt + options.config.authStateTtlMs
   })
 
-  app.post<{ Body: { sessionCode: string } }>(
-    '/v1/auth/exchange',
-    async (request, reply) => {
-      const sessionCode = request.body?.sessionCode?.trim()
-      if (!sessionCode) {
-        return reply.code(400).send({
-          error: 'MISSING_SESSION_CODE'
-        })
-      }
+  const authUrl = buildGoogleAuthUrl({
+    config: options.config,
+    state
+  })
 
-      const exchangeCode = await options.exchangeCodeStore.consume(sessionCode)
-      if (!exchangeCode) {
-        return reply.code(401).send({
-          error: 'INVALID_OR_EXPIRED_SESSION_CODE'
-        })
-      }
+  return jsonResponse({
+    authUrl,
+    state
+  })
+}
 
-      const session = await options.sessionStore.create(
-        exchangeCode.userId,
-        options.config.sessionTtlMs
-      )
+export async function handleAuthCallback(
+  request: Request,
+  options: AuthRoutesOptions
+): Promise<Response> {
+  const url = new URL(request.url)
 
-      return {
-        sessionToken: session.token,
-        expiresAt: session.expiresAt
-      }
-    }
+  const providerError = url.searchParams.get('error')
+  if (providerError) {
+    return errorResponse(400, 'OAUTH_PROVIDER_ERROR', {
+      detail: url.searchParams.get('error_description') || providerError
+    })
+  }
+
+  const state = url.searchParams.get('state') || ''
+  const code = url.searchParams.get('code') || ''
+  if (!state || !code) {
+    return errorResponse(400, 'INVALID_CALLBACK_PARAMS')
+  }
+
+  const authState = await options.authStateStore.consume(state)
+  if (!authState) {
+    return errorResponse(400, 'INVALID_OR_EXPIRED_STATE')
+  }
+
+  const tokenPayload = await exchangeGoogleAuthCode({
+    config: options.config,
+    code
+  })
+
+  const userId = extractGoogleUserId(tokenPayload.id_token)
+  if (!userId) {
+    return errorResponse(400, 'MISSING_USER_ID_IN_ID_TOKEN')
+  }
+
+  if (options.config.allowedGoogleUserId && options.config.allowedGoogleUserId !== userId) {
+    return errorResponse(403, 'GOOGLE_USER_NOT_ALLOWED')
+  }
+
+  const existing = await options.googleTokenStore.getByUserId(userId)
+  const refreshToken = tokenPayload.refresh_token || existing?.refreshToken
+  if (!refreshToken) {
+    return errorResponse(400, 'MISSING_REFRESH_TOKEN', {
+      detail: 'Google did not return refresh_token and no existing token is stored.'
+    })
+  }
+
+  await options.googleTokenStore.upsert({
+    userId,
+    refreshToken,
+    ...(tokenPayload.scope ? { scope: tokenPayload.scope } : {}),
+    updatedAt: Date.now()
+  })
+
+  const exchangeCode = await options.exchangeCodeStore.create(
+    userId,
+    options.config.exchangeCodeTtlMs
   )
 
-  app.post('/v1/auth/logout', async (request, reply) => {
-    const token = parseBearerToken(request.headers.authorization)
-    if (!token) {
-      return reply.code(401).send({ error: 'MISSING_AUTHORIZATION' })
-    }
+  return redirectResponse(
+    withParam(authState.extensionRedirectUri, 'session_code', exchangeCode.code)
+  )
+}
 
-    await options.sessionStore.revoke(token)
-    return reply.code(204).send()
+export async function handleAuthExchange(
+  request: Request,
+  options: AuthRoutesOptions
+): Promise<Response> {
+  const body = await readJsonBody(request)
+  const sessionCode = readStringField(body, 'sessionCode')?.trim()
+
+  if (!sessionCode) {
+    return errorResponse(400, 'MISSING_SESSION_CODE')
+  }
+
+  const exchangeCode = await options.exchangeCodeStore.consume(sessionCode)
+  if (!exchangeCode) {
+    return errorResponse(401, 'INVALID_OR_EXPIRED_SESSION_CODE')
+  }
+
+  const session = await options.sessionStore.create(
+    exchangeCode.userId,
+    options.config.sessionTtlMs
+  )
+
+  return jsonResponse({
+    sessionToken: session.token,
+    expiresAt: session.expiresAt
   })
+}
+
+export async function handleAuthLogout(
+  request: Request,
+  options: AuthRoutesOptions
+): Promise<Response> {
+  const token = parseBearerToken(request.headers.get('authorization') || undefined)
+  if (!token) {
+    return errorResponse(401, 'MISSING_AUTHORIZATION')
+  }
+
+  await options.sessionStore.revoke(token)
+  return emptyResponse(204)
 }

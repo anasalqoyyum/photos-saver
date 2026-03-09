@@ -4,6 +4,7 @@ import {
   SessionRecord,
   StoredGoogleTokens
 } from './types.js'
+import { bytesToBase64Url } from './base64.js'
 import { TokenCipher } from './token-crypto.js'
 import { D1DatabaseLike, KVNamespaceLike } from './worker-bindings.js'
 
@@ -34,7 +35,7 @@ function now(): number {
 
 function randomToken(prefix: string): string {
   const randomBytes = crypto.getRandomValues(new Uint8Array(24))
-  const payload = Buffer.from(randomBytes).toString('base64url')
+  const payload = bytesToBase64Url(randomBytes)
   return `${prefix}_${payload}`
 }
 

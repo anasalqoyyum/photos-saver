@@ -2,3 +2,5 @@ node_modules/
 dist/
 .env
 backend/.env
+backend/.dev.vars
+backend/.wrangler/
