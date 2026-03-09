@@ -1,4 +1,4 @@
-name = "photos-saver-backend"
+name = "photos-saver"
 main = "src/worker.ts"
 compatibility_date = "2026-02-27"
 
