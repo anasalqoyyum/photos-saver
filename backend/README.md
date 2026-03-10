@@ -12,10 +12,18 @@ Worker-native Hono backend for OAuth and Google Photos uploads.
 - `GOOGLE_OAUTH_FORCE_CONSENT` (optional; defaults to `false`)
 - `CORS_ORIGIN` (optional; defaults to `chrome-extension://<id>` and localhost origins)
 - `ALLOWED_GOOGLE_USER_ID` (optional, recommended for single-user mode)
-- `SESSION_TTL_MS` (optional)
-- `AUTH_STATE_TTL_MS` (optional)
-- `EXCHANGE_CODE_TTL_MS` (optional)
+- `SESSION_TTL_MS` (optional; defaults to `900000` / 15 minutes)
+- `AUTH_STATE_TTL_MS` (optional; defaults to `300000` / 5 minutes)
+- `EXCHANGE_CODE_TTL_MS` (optional; defaults to `120000` / 2 minutes)
 - `MAX_UPLOAD_BYTES` (optional)
+
+Recommended personal-use values:
+
+```env
+SESSION_TTL_MS=2592000000 / 30 days
+AUTH_STATE_TTL_MS=600000 / 10 minutes
+EXCHANGE_CODE_TTL_MS=300000 / 5 minutes
+```
 
 ## Routes
 

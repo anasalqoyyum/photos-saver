@@ -9,6 +9,9 @@ enabled = true
 GOOGLE_CLIENT_ID = "478240865692-hqht6c29pg3lspglq2hbtc95djiakj7u.apps.googleusercontent.com"
 GOOGLE_OAUTH_REDIRECT_URI = "https://photos-saver.anasalqoyyum.dev/v1/auth/callback"
 CORS_ORIGIN = "*"
+SESSION_TTL_MS = "2592000000"
+AUTH_STATE_TTL_MS = "600000"
+EXCHANGE_CODE_TTL_MS = "300000"
 
 [[kv_namespaces]]
 binding = "AUTH_KV"
