@@ -71,7 +71,7 @@ function extensionFromMime(contentType: string | null): string | null {
 export function sanitizeFilename(name: string): string {
   // Strip ASCII control characters (code points 0–31) to avoid quadratic-time concatenation in a loop.
   // oxlint-disable-next-line no-control-regex
- const noControlChars = name.replace(/[\x00-\x1F]/g, '')
+  const noControlChars = name.replace(/[\x00-\x1F]/g, '')
 
   const cleaned = noControlChars.replace(ILLEGAL_FILENAME_CHARS, '_').replace(LEADING_DOTS, '').trim()
 
