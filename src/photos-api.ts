@@ -41,10 +41,7 @@ export async function uploadBytes(input: UploadInput): Promise<string> {
     warn('Google Photos upload rejected OAuth token.', {
       fileName: input.fileName
     })
-    throw new ExtensionError(
-      'AUTH_FAILED',
-      'OAuth token was rejected by Google Photos.'
-    )
+    throw new ExtensionError('AUTH_FAILED', 'OAuth token was rejected by Google Photos.')
   }
 
   if (!response.ok) {
@@ -52,10 +49,7 @@ export async function uploadBytes(input: UploadInput): Promise<string> {
       fileName: input.fileName,
       status: response.status
     })
-    throw new ExtensionError(
-      'UPLOAD_FAILED',
-      `Upload bytes failed with status ${response.status}.`
-    )
+    throw new ExtensionError('UPLOAD_FAILED', `Upload bytes failed with status ${response.status}.`)
   }
 
   const uploadToken = (await response.text()).trim()
@@ -63,10 +57,7 @@ export async function uploadBytes(input: UploadInput): Promise<string> {
     warn('Google Photos returned empty upload token.', {
       fileName: input.fileName
     })
-    throw new ExtensionError(
-      'UPLOAD_FAILED',
-      'Google Photos did not return an upload token.'
-    )
+    throw new ExtensionError('UPLOAD_FAILED', 'Google Photos did not return an upload token.')
   }
 
   debug('Google Photos byte upload completed.', {
@@ -75,12 +66,7 @@ export async function uploadBytes(input: UploadInput): Promise<string> {
   return uploadToken
 }
 
-export async function createMediaItem(input: {
-  token: string
-  uploadToken: string
-  fileName: string
-  description: string
-}): Promise<void> {
+export async function createMediaItem(input: { token: string; uploadToken: string; fileName: string; description: string }): Promise<void> {
   debug('Creating Google Photos media item.', {
     fileName: input.fileName,
     descriptionLength: input.description.length
@@ -109,10 +95,7 @@ export async function createMediaItem(input: {
     warn('Google Photos create rejected OAuth token.', {
       fileName: input.fileName
     })
-    throw new ExtensionError(
-      'AUTH_FAILED',
-      'OAuth token was rejected by Google Photos.'
-    )
+    throw new ExtensionError('AUTH_FAILED', 'OAuth token was rejected by Google Photos.')
   }
 
   if (!response.ok) {
@@ -120,10 +103,7 @@ export async function createMediaItem(input: {
       fileName: input.fileName,
       status: response.status
     })
-    throw new ExtensionError(
-      'CREATE_FAILED',
-      `Batch create failed with status ${response.status}.`
-    )
+    throw new ExtensionError('CREATE_FAILED', `Batch create failed with status ${response.status}.`)
   }
 
   const payload = (await response.json()) as {
@@ -140,16 +120,12 @@ export async function createMediaItem(input: {
     warn('Google Photos batchCreate returned no item results.', {
       fileName: input.fileName
     })
-    throw new ExtensionError(
-      'CREATE_FAILED',
-      'No media item result returned by Google Photos.'
-    )
+    throw new ExtensionError('CREATE_FAILED', 'No media item result returned by Google Photos.')
   }
 
   const statusCode = firstResult.status?.code
   if (typeof statusCode === 'number' && statusCode !== 0) {
-    const message =
-      firstResult.status?.message || 'Unknown Google Photos create error.'
+    const message = firstResult.status?.message || 'Unknown Google Photos create error.'
     warn('Google Photos returned media item creation status error.', {
       fileName: input.fileName,
       statusCode,

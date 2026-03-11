@@ -21,10 +21,7 @@ export interface WorkerApp {
 
 type CorsOriginConfig = true | string | Array<string | RegExp>
 
-const LOCAL_ORIGIN_PATTERNS = [
-  /^http:\/\/localhost(?::\d+)?$/,
-  /^http:\/\/127\.0\.0\.1(?::\d+)?$/
-]
+const LOCAL_ORIGIN_PATTERNS = [/^http:\/\/localhost(?::\d+)?$/, /^http:\/\/127\.0\.0\.1(?::\d+)?$/]
 
 const EXTENSION_ORIGIN_PATTERN = /^chrome-extension:\/\/[a-p]{32}$/
 
@@ -92,10 +89,7 @@ function corsOriginValue(origin: string, config: CorsOriginConfig): string | und
   return config === true ? '*' : origin
 }
 
-export async function buildApp(
-  config: AppConfig = loadConfig(),
-  bindings?: WorkerBindings
-): Promise<WorkerApp> {
+export async function buildApp(config: AppConfig = loadConfig(), bindings?: WorkerBindings): Promise<WorkerApp> {
   const stores = await createStoresForRuntime(config, bindings)
   const corsConfig = parseCorsOrigin(config.corsOrigin)
 

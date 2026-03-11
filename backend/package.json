@@ -7,8 +7,9 @@
     "dev": "pnpm dlx wrangler dev",
     "build": "pnpm dlx wrangler deploy --dry-run",
     "deploy": "pnpm dlx wrangler deploy",
+    "deploy:version": "pnpm dlx wrangler versions upload",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --import tsx tests/**/*.test.ts"
+    "test": "vitest run tests"
   },
   "dependencies": {
     "hono": "^4.10.6"
@@ -16,6 +17,7 @@
   "devDependencies": {
     "@types/node": "^24.3.0",
     "tsx": "^4.20.5",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vitest": "^4.0.18"
   }
 }

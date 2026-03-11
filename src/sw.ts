@@ -3,7 +3,7 @@ import { uploadImageViaBackend } from './backend-api.js'
 import { BACKEND_MODE_ENABLED } from './backend-config.js'
 import { CONTEXT_MENU_ID, CONTEXT_MENU_TITLE } from './constants.js'
 import { normalizeError, toUserMessage } from './errors.js'
-import { normalizeDescription } from './filename.js'
+import { buildDescription } from './filename.js'
 import { fetchImageFromSource } from './image-fetch.js'
 import { debug, error as logError, warn } from './logger.js'
 import { notifyFailure, notifyInProgress, notifySuccess } from './notify.js'
@@ -38,13 +38,10 @@ chrome.runtime.onStartup.addListener(() => {
   void createContextMenu()
 })
 
-async function uploadImageWithToken(
-  sourceUrl: string,
-  token: string
-): Promise<string> {
+async function uploadImageWithToken(sourceUrl: string, token: string, pageUrl?: string): Promise<string> {
   debug('Beginning upload flow with token.', { sourceUrl })
   const image = await fetchImageFromSource(sourceUrl)
-  const description = normalizeDescription(image.sourceUrl)
+  const description = buildDescription(image.sourceUrl, pageUrl)
 
   const uploadToken = await uploadBytes({
     token,
@@ -68,23 +65,23 @@ async function uploadImageWithToken(
   return image.fileName
 }
 
-async function uploadImageWithBackend(sourceUrl: string): Promise<string> {
+async function uploadImageWithBackend(sourceUrl: string, pageUrl?: string): Promise<string> {
   debug('Using backend upload mode.', { sourceUrl })
   const image = await fetchImageFromSource(sourceUrl)
-  await uploadImageViaBackend(image)
+  await uploadImageViaBackend(image, pageUrl)
   return image.fileName
 }
 
-async function saveImageToGooglePhotos(sourceUrl: string): Promise<string> {
+async function saveImageToGooglePhotos(sourceUrl: string, pageUrl?: string): Promise<string> {
   if (BACKEND_MODE_ENABLED) {
-    return uploadImageWithBackend(sourceUrl)
+    return uploadImageWithBackend(sourceUrl, pageUrl)
   }
 
   debug('Resolving OAuth token for save request.', { sourceUrl })
   const initialToken = await getAccessToken()
 
   try {
-    return await uploadImageWithToken(sourceUrl, initialToken)
+    return await uploadImageWithToken(sourceUrl, initialToken, pageUrl)
   } catch (error) {
     const normalized = normalizeError(error)
     if (normalized.code !== 'AUTH_FAILED') {
@@ -101,7 +98,7 @@ async function saveImageToGooglePhotos(sourceUrl: string): Promise<string> {
     })
     await invalidateToken(initialToken)
     const refreshedToken = await getAccessToken()
-    return uploadImageWithToken(sourceUrl, refreshedToken)
+    return uploadImageWithToken(sourceUrl, refreshedToken, pageUrl)
   }
 }
 
@@ -121,9 +118,10 @@ chrome.contextMenus.onClicked.addListener(async info => {
   }
 
   const sourceUrl = info.srcUrl
+  const pageUrl = info.pageUrl
   debug('Context menu clicked.', {
     hasSourceUrl: !!sourceUrl,
-    pageUrl: info.pageUrl
+    pageUrl
   })
 
   if (!sourceUrl) {
@@ -134,7 +132,7 @@ chrome.contextMenus.onClicked.addListener(async info => {
 
   try {
     await notifyInProgress()
-    const fileName = await saveImageToGooglePhotos(sourceUrl)
+    const fileName = await saveImageToGooglePhotos(sourceUrl, pageUrl)
     await notifySuccess(fileName)
     debug('Save request completed.', { sourceUrl, fileName })
   } catch (error) {

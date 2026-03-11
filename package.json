@@ -7,18 +7,29 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --import tsx tests/**/*.test.ts",
+    "test": "vitest run tests",
     "backend:dev": "pnpm --filter photos-saver-backend dev",
     "backend:build": "pnpm --filter photos-saver-backend run build",
     "backend:deploy": "pnpm --filter photos-saver-backend run deploy",
+    "backend:deploy:version": "pnpm --filter photos-saver-backend run deploy:version",
     "backend:typecheck": "pnpm --filter photos-saver-backend typecheck",
-    "backend:test": "pnpm --filter photos-saver-backend test"
+    "backend:test": "pnpm --filter photos-saver-backend test",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
+    "lint": "oxlint --type-aware --type-check",
+    "lint:fix": "oxlint --type-aware --type-check --quiet --fix"
   },
   "devDependencies": {
-    "@types/node": "^24.3.0",
     "@types/chrome": "^0.1.21",
-    "tsx": "^4.20.5",
-    "typescript": "^5.9.2"
+    "@types/node": "^24.3.0",
+    "oxfmt": "^0.37.0",
+    "oxlint": "^1.52.0",
+    "oxlint-tsgolint": "^0.16.0",
+    "typescript": "^5.9.2",
+    "vitest": "^4.0.18"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
   },
   "packageManager": "pnpm@10.26.1+sha512.664074abc367d2c9324fdc18037097ce0a8f126034160f709928e9e9f95d98714347044e5c3164d65bd5da6c59c6be362b107546292a8eecb7999196e5ce58fa"
 }

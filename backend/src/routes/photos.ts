@@ -1,8 +1,8 @@
 import { base64ToBytes as decodeBase64ToBytes } from '../base64.js'
 import { AppConfig } from '../config.js'
 import { errorResponse, jsonResponse, parseBearerToken, readJsonBody } from '../http.js'
-import { GooglePhotosApiError, uploadImageToGooglePhotos } from '../services/google-photos.js'
 import { refreshGoogleAccessToken } from '../services/google-oauth.js'
+import { GooglePhotosApiError, uploadImageToGooglePhotos } from '../services/google-photos.js'
 import { GoogleTokenStore, SessionStore } from '../store.js'
 
 interface UploadRequestBody {
@@ -10,6 +10,7 @@ interface UploadRequestBody {
   fileName: string
   sourceUrl: string
   contentType: string | null
+  pageUrl: string | null
 }
 
 export interface PhotosRoutesOptions {
@@ -27,10 +28,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function hasOnlyAllowedKeys(
-  value: Record<string, unknown>,
-  allowedKeys: readonly string[]
-): boolean {
+function hasOnlyAllowedKeys(value: Record<string, unknown>, allowedKeys: readonly string[]): boolean {
   return Object.keys(value).every(key => allowedKeys.includes(key))
 }
 
@@ -52,16 +50,12 @@ function validateUploadBody(
     return { ok: false, error: 'INVALID_UPLOAD_BODY' }
   }
 
-  const allowedKeys = ['imageBase64', 'fileName', 'sourceUrl', 'contentType'] as const
+  const allowedKeys = ['imageBase64', 'fileName', 'sourceUrl', 'contentType', 'pageUrl'] as const
   if (!hasOnlyAllowedKeys(body, allowedKeys)) {
     return { ok: false, error: 'UNEXPECTED_UPLOAD_FIELDS' }
   }
 
-  if (
-    typeof body.imageBase64 !== 'string' ||
-    typeof body.fileName !== 'string' ||
-    typeof body.sourceUrl !== 'string'
-  ) {
+  if (typeof body.imageBase64 !== 'string' || typeof body.fileName !== 'string' || typeof body.sourceUrl !== 'string') {
     return { ok: false, error: 'MISSING_UPLOAD_FIELDS' }
   }
 
@@ -78,17 +72,23 @@ function validateUploadBody(
   }
 
   const contentTypeRaw = body.contentType
-  if (
-    contentTypeRaw !== undefined &&
-    contentTypeRaw !== null &&
-    typeof contentTypeRaw !== 'string'
-  ) {
+  if (contentTypeRaw !== undefined && contentTypeRaw !== null && typeof contentTypeRaw !== 'string') {
     return { ok: false, error: 'INVALID_CONTENT_TYPE' }
   }
 
   const contentType = contentTypeRaw ? contentTypeRaw.trim() : null
   if (contentType && contentType.length > MAX_CONTENT_TYPE_LENGTH) {
     return { ok: false, error: 'INVALID_CONTENT_TYPE' }
+  }
+
+  const pageUrlRaw = body.pageUrl
+  if (pageUrlRaw !== undefined && pageUrlRaw !== null && typeof pageUrlRaw !== 'string') {
+    return { ok: false, error: 'INVALID_UPLOAD_BODY' }
+  }
+
+  const pageUrl = pageUrlRaw?.trim() || null
+  if (pageUrl && pageUrl.length > MAX_SOURCE_URL_LENGTH) {
+    return { ok: false, error: 'INVALID_UPLOAD_BODY' }
   }
 
   const maxBase64Length = Math.ceil((maxUploadBytes * 4) / 3) + 4
@@ -102,7 +102,8 @@ function validateUploadBody(
       imageBase64,
       fileName,
       sourceUrl,
-      contentType
+      contentType,
+      pageUrl
     }
   }
 }
@@ -120,13 +121,7 @@ function base64ToBytes(base64: string): Uint8Array | null {
 }
 
 function isBase64Char(code: number): boolean {
-  return (
-    (code >= 65 && code <= 90) ||
-    (code >= 97 && code <= 122) ||
-    (code >= 48 && code <= 57) ||
-    code === 43 ||
-    code === 47
-  )
+  return (code >= 65 && code <= 90) || (code >= 97 && code <= 122) || (code >= 48 && code <= 57) || code === 43 || code === 47
 }
 
 function isValidBase64(value: string): boolean {
@@ -192,10 +187,7 @@ function hasGoogleScope(scopeList: string | undefined, requiredScope: string): b
     .includes(requiredScope)
 }
 
-export async function handlePhotoUpload(
-  request: Request,
-  options: PhotosRoutesOptions
-): Promise<Response> {
+export async function handlePhotoUpload(request: Request, options: PhotosRoutesOptions): Promise<Response> {
   const bearerToken = parseBearerToken(request.headers.get('authorization') || undefined)
   if (!bearerToken) {
     return errorResponse(401, 'MISSING_AUTHORIZATION')
@@ -225,7 +217,8 @@ export async function handlePhotoUpload(
     return errorResponse(400, validated.error)
   }
 
-  const { fileName, sourceUrl, imageBase64, contentType } = validated.value
+  const { fileName, sourceUrl, imageBase64, contentType, pageUrl } = validated.value
+  const normalizedPageUrl = pageUrl && isHttpUrl(pageUrl) ? pageUrl : null
 
   if (!isHttpUrl(sourceUrl)) {
     return errorResponse(400, 'INVALID_SOURCE_URL')
@@ -251,13 +244,9 @@ export async function handlePhotoUpload(
     return errorResponse(401, 'USER_NOT_LINKED_TO_GOOGLE')
   }
 
-  if (
-    storedGoogleToken.scope &&
-    !hasGoogleScope(storedGoogleToken.scope, GOOGLE_PHOTOS_APPENDONLY_SCOPE)
-  ) {
+  if (storedGoogleToken.scope && !hasGoogleScope(storedGoogleToken.scope, GOOGLE_PHOTOS_APPENDONLY_SCOPE)) {
     return errorResponse(403, 'GOOGLE_SCOPE_MISSING', {
-      detail:
-        'Stored Google authorization is missing Google Photos append scope. Re-link the backend Google account.',
+      detail: 'Stored Google authorization is missing Google Photos append scope. Re-link the backend Google account.',
       grantedScope: storedGoogleToken.scope,
       requiredScope: GOOGLE_PHOTOS_APPENDONLY_SCOPE
     })
@@ -284,8 +273,7 @@ export async function handlePhotoUpload(
 
   if (refreshed.scope && !hasGoogleScope(refreshed.scope, GOOGLE_PHOTOS_APPENDONLY_SCOPE)) {
     return errorResponse(403, 'GOOGLE_SCOPE_MISSING', {
-      detail:
-        'Refreshed Google access token is missing Google Photos append scope. Re-link the backend Google account.',
+      detail: 'Refreshed Google access token is missing Google Photos append scope. Re-link the backend Google account.',
       grantedScope: refreshed.scope,
       requiredScope: GOOGLE_PHOTOS_APPENDONLY_SCOPE
     })
@@ -297,7 +285,8 @@ export async function handlePhotoUpload(
       bytes,
       fileName,
       contentType,
-      sourceUrl
+      sourceUrl,
+      pageUrl: normalizedPageUrl
     })
 
     return jsonResponse({

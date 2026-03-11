@@ -31,9 +31,7 @@ function isLikelyGoogleChrome(): boolean {
   return /Chrome\/\d+/i.test(ua) && !/Edg\//i.test(ua) && !/OPR\//i.test(ua)
 }
 
-function getAuthToken(
-  details: chrome.identity.TokenDetails
-): Promise<AuthTokenResult> {
+function getAuthToken(details: chrome.identity.TokenDetails): Promise<AuthTokenResult> {
   debug('Requesting OAuth token.', { interactive: !!details.interactive })
 
   return new Promise((resolve, reject) => {
@@ -44,12 +42,7 @@ function getAuthToken(
           interactive: !!details.interactive,
           message: runtimeError.message
         })
-        reject(
-          new ExtensionError(
-            'AUTH_FAILED',
-            runtimeError.message || 'Authentication failed.'
-          )
-        )
+        reject(new ExtensionError('AUTH_FAILED', runtimeError.message || 'Authentication failed.'))
         return
       }
 
@@ -78,10 +71,7 @@ function getAuthToken(
   })
 }
 
-function getAuthTokenWithTimeout(
-  details: chrome.identity.TokenDetails,
-  timeoutMs: number
-): Promise<AuthTokenResult> {
+function getAuthTokenWithTimeout(details: chrome.identity.TokenDetails, timeoutMs: number): Promise<AuthTokenResult> {
   return new Promise((resolve, reject) => {
     const timeoutHandle = setTimeout(() => {
       reject(new ExtensionError('AUTH_FAILED', 'Timed out while requesting OAuth token.'))
@@ -104,10 +94,7 @@ function getCachedPkceToken(): string | null {
     return null
   }
 
-  if (
-    typeof pkceTokenCache.expiresAt === 'number' &&
-    Date.now() + TOKEN_EXPIRY_SKEW_MS >= pkceTokenCache.expiresAt
-  ) {
+  if (typeof pkceTokenCache.expiresAt === 'number' && Date.now() + TOKEN_EXPIRY_SKEW_MS >= pkceTokenCache.expiresAt) {
     debug('Cached PKCE token expired. Clearing cache.')
     pkceTokenCache = null
     return null
@@ -149,10 +136,7 @@ export async function getAccessToken(): Promise<string> {
 
   try {
     debug('Requesting interactive OAuth token.')
-    const interactiveResult = await getAuthTokenWithTimeout(
-      { interactive: true },
-      20_000
-    )
+    const interactiveResult = await getAuthTokenWithTimeout({ interactive: true }, 20_000)
     if (!interactiveResult.token) {
       throw new ExtensionError('AUTH_FAILED', 'Unable to acquire OAuth token.')
     }
