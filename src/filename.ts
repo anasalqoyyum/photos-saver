@@ -70,7 +70,8 @@ function extensionFromMime(contentType: string | null): string | null {
 
 export function sanitizeFilename(name: string): string {
   // Strip ASCII control characters (code points 0–31) to avoid quadratic-time concatenation in a loop.
-  const noControlChars = name.replace(/[\x00-\x1F]/g, '')
+  // oxlint-disable-next-line no-control-regex
+ const noControlChars = name.replace(/[\x00-\x1F]/g, '')
 
   const cleaned = noControlChars.replace(ILLEGAL_FILENAME_CHARS, '_').replace(LEADING_DOTS, '').trim()
 
@@ -111,9 +112,18 @@ export function normalizeDescription(sourceUrl: string): string {
   return sourceUrl.slice(0, MAX_DESCRIPTION_LENGTH)
 }
 
+function isHttpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 export function buildDescription(sourceUrl: string, pageUrl?: string | null): string {
   const normalizedPageUrl = pageUrl?.trim()
-  if (!normalizedPageUrl || normalizedPageUrl === sourceUrl) {
+  if (!normalizedPageUrl || normalizedPageUrl === sourceUrl || !isHttpUrl(normalizedPageUrl)) {
     return normalizeDescription(sourceUrl)
   }
 

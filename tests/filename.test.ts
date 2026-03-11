@@ -43,4 +43,12 @@ describe('buildDescription', () => {
   it('ignores missing page URL', () => {
     expect(buildDescription('https://images.example.com/photo.jpg', null)).toBe('https://images.example.com/photo.jpg')
   })
+
+  it('ignores non-http page URL (chrome://, file://, extension)', () => {
+    expect(buildDescription('https://images.example.com/photo.jpg', 'chrome://extension://abc123')).toBe(
+      'https://images.example.com/photo.jpg'
+    )
+    expect(buildDescription('https://images.example.com/photo.jpg', 'file:///local/path')).toBe('https://images.example.com/photo.jpg')
+    expect(buildDescription('https://images.example.com/photo.jpg', 'moz-extension://xyz')).toBe('https://images.example.com/photo.jpg')
+  })
 })
