@@ -1,6 +1,6 @@
 const PHOTOS_UPLOADS_URL = 'https://photoslibrary.googleapis.com/v1/uploads'
-const PHOTOS_BATCH_CREATE_URL =
-  'https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate'
+const PHOTOS_BATCH_CREATE_URL = 'https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate'
+const MAX_DESCRIPTION_LENGTH = 1000
 
 export class GooglePhotosApiError extends Error {
   constructor(
@@ -61,6 +61,23 @@ function asContentType(value: string | null): string {
   return value.split(';')[0]?.trim() || 'application/octet-stream'
 }
 
+function normalizeDescription(value: string): string {
+  if (value.length <= MAX_DESCRIPTION_LENGTH) {
+    return value
+  }
+
+  return value.slice(0, MAX_DESCRIPTION_LENGTH)
+}
+
+export function buildUploadDescription(sourceUrl: string, pageUrl?: string | null): string {
+  const normalizedPageUrl = pageUrl?.trim()
+  if (!normalizedPageUrl || normalizedPageUrl === sourceUrl) {
+    return normalizeDescription(sourceUrl)
+  }
+
+  return normalizeDescription(`${sourceUrl}\n\nSaved from: ${normalizedPageUrl}`)
+}
+
 async function uploadRawBytes(params: {
   accessToken: string
   bytes: Uint8Array
@@ -103,6 +120,7 @@ async function createMediaItem(params: {
   uploadToken: string
   fileName: string
   sourceUrl: string
+  pageUrl: string | null
 }): Promise<string> {
   const response = await fetch(PHOTOS_BATCH_CREATE_URL, {
     method: 'POST',
@@ -113,7 +131,7 @@ async function createMediaItem(params: {
     body: JSON.stringify({
       newMediaItems: [
         {
-          description: params.sourceUrl,
+          description: buildUploadDescription(params.sourceUrl, params.pageUrl),
           simpleMediaItem: {
             uploadToken: params.uploadToken,
             fileName: params.fileName
@@ -152,9 +170,7 @@ async function createMediaItem(params: {
 
   const code = result.status?.code
   if (typeof code === 'number' && code !== 0) {
-    throw new Error(
-      `Google Photos media item create error (${code}): ${result.status?.message || 'unknown'}`
-    )
+    throw new Error(`Google Photos media item create error (${code}): ${result.status?.message || 'unknown'}`)
   }
 
   return result.mediaItem?.id || 'unknown'
@@ -166,6 +182,7 @@ export async function uploadImageToGooglePhotos(params: {
   fileName: string
   contentType: string | null
   sourceUrl: string
+  pageUrl: string | null
 }): Promise<{ mediaItemId: string }> {
   const uploadToken = await uploadRawBytes({
     accessToken: params.accessToken,
@@ -178,7 +195,8 @@ export async function uploadImageToGooglePhotos(params: {
     accessToken: params.accessToken,
     uploadToken,
     fileName: params.fileName,
-    sourceUrl: params.sourceUrl
+    sourceUrl: params.sourceUrl,
+    pageUrl: params.pageUrl
   })
 
   return { mediaItemId }

@@ -1,19 +1,22 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { describe, expect, it } from 'vitest'
 
 import { ExtensionError, normalizeError, toUserMessage } from '../src/errors.ts'
 
-test('normalizeError passes through ExtensionError', () => {
-  const input = new ExtensionError('FETCH_FAILED', 'boom')
-  assert.equal(normalizeError(input), input)
+describe('normalizeError', () => {
+  it('passes through ExtensionError', () => {
+    const input = new ExtensionError('FETCH_FAILED', 'boom')
+    expect(normalizeError(input)).toBe(input)
+  })
+
+  it('wraps unknown values', () => {
+    const err = normalizeError('nope')
+    expect(err.code).toBe('UNKNOWN')
+  })
 })
 
-test('normalizeError wraps unknown values', () => {
-  const err = normalizeError('nope')
-  assert.equal(err.code, 'UNKNOWN')
-})
-
-test('toUserMessage maps auth errors', () => {
-  const msg = toUserMessage(new ExtensionError('AUTH_FAILED', 'x'))
-  assert.equal(msg, 'Google sign-in failed. Please try again.')
+describe('toUserMessage', () => {
+  it('maps auth errors', () => {
+    const msg = toUserMessage(new ExtensionError('AUTH_FAILED', 'x'))
+    expect(msg).toBe('Google sign-in failed. Please try again.')
+  })
 })

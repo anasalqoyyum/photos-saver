@@ -1,4 +1,4 @@
-import { MAX_FILENAME_LENGTH } from './constants.js'
+import { MAX_DESCRIPTION_LENGTH, MAX_FILENAME_LENGTH } from './constants.js'
 
 const ILLEGAL_FILENAME_CHARS = /[<>:"/\\|?*]/g
 const LEADING_DOTS = /^\.+/
@@ -15,9 +15,7 @@ const EXT_BY_MIME: Record<string, string> = {
   'image/avif': 'avif'
 }
 
-function parseContentDispositionFilename(
-  contentDisposition: string | null
-): string | null {
+function parseContentDispositionFilename(contentDisposition: string | null): string | null {
   if (!contentDisposition) {
     return null
   }
@@ -71,14 +69,14 @@ function extensionFromMime(contentType: string | null): string | null {
 }
 
 export function sanitizeFilename(name: string): string {
-  const noControlChars = [...name]
-    .filter(char => char.charCodeAt(0) >= 32)
-    .join('')
+  let noControlChars = ''
+  for (const char of name) {
+    if (char.charCodeAt(0) >= 32) {
+      noControlChars += char
+    }
+  }
 
-  const cleaned = noControlChars
-    .replace(ILLEGAL_FILENAME_CHARS, '_')
-    .replace(LEADING_DOTS, '')
-    .trim()
+  const cleaned = noControlChars.replace(ILLEGAL_FILENAME_CHARS, '_').replace(LEADING_DOTS, '').trim()
 
   if (!cleaned) {
     return 'image'
@@ -87,10 +85,7 @@ export function sanitizeFilename(name: string): string {
   return cleaned.slice(0, MAX_FILENAME_LENGTH)
 }
 
-export function ensureExtension(
-  filename: string,
-  contentType: string | null
-): string {
+export function ensureExtension(filename: string, contentType: string | null): string {
   if (filename.includes('.')) {
     return filename
   }
@@ -103,14 +98,8 @@ export function ensureExtension(
   return `${filename}.${ext}`
 }
 
-export function resolveFilename(params: {
-  sourceUrl: string
-  contentDisposition: string | null
-  contentType: string | null
-}): string {
-  const fromDisposition = parseContentDispositionFilename(
-    params.contentDisposition
-  )
+export function resolveFilename(params: { sourceUrl: string; contentDisposition: string | null; contentType: string | null }): string {
+  const fromDisposition = parseContentDispositionFilename(params.contentDisposition)
   const fromUrl = filenameFromUrl(params.sourceUrl)
   const fallback = `image-${Date.now()}`
 
@@ -119,9 +108,18 @@ export function resolveFilename(params: {
 }
 
 export function normalizeDescription(sourceUrl: string): string {
-  if (sourceUrl.length <= 1000) {
+  if (sourceUrl.length <= MAX_DESCRIPTION_LENGTH) {
     return sourceUrl
   }
 
-  return sourceUrl.slice(0, 1000)
+  return sourceUrl.slice(0, MAX_DESCRIPTION_LENGTH)
+}
+
+export function buildDescription(sourceUrl: string, pageUrl?: string | null): string {
+  const normalizedPageUrl = pageUrl?.trim()
+  if (!normalizedPageUrl || normalizedPageUrl === sourceUrl) {
+    return normalizeDescription(sourceUrl)
+  }
+
+  return normalizeDescription(`${sourceUrl}\n\nSaved from: ${normalizedPageUrl}`)
 }

@@ -1,8 +1,6 @@
 import { debug, warn } from './logger.js'
 
-function notify(
-  options: chrome.notifications.NotificationCreateOptions
-): Promise<void> {
+function notify(options: chrome.notifications.NotificationCreateOptions): Promise<void> {
   return new Promise(resolve => {
     const id = `save-to-gphotos-${Date.now()}`
     chrome.notifications.create(id, options, () => {
@@ -18,8 +16,7 @@ function notify(
   })
 }
 
-const NOTIFICATION_ICON =
-  'https://fonts.gstatic.com/s/i/productlogos/photos/v9/web-64dp/logo_photos_color_1x_web_64dp.png'
+const NOTIFICATION_ICON = 'https://fonts.gstatic.com/s/i/productlogos/photos/v9/web-64dp/logo_photos_color_1x_web_64dp.png'
 
 export async function notifySuccess(fileName: string): Promise<void> {
   debug('Showing success notification.', { fileName })

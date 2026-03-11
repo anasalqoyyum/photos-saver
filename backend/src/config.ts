@@ -59,12 +59,8 @@ function defaultEnv(): Record<string, string | undefined> {
   return {}
 }
 
-export function loadConfig(
-  env: Record<string, string | undefined> = defaultEnv()
-): AppConfig {
-  const scopeString =
-    env.GOOGLE_SCOPES ||
-    'https://www.googleapis.com/auth/photoslibrary.appendonly openid email'
+export function loadConfig(env: Record<string, string | undefined> = defaultEnv()): AppConfig {
+  const scopeString = env.GOOGLE_SCOPES || 'https://www.googleapis.com/auth/photoslibrary.appendonly openid email'
 
   const googleScopes = scopeString
     .split(' ')
@@ -74,18 +70,11 @@ export function loadConfig(
   return {
     googleClientId: required(env.GOOGLE_CLIENT_ID, 'GOOGLE_CLIENT_ID'),
     googleClientSecret: required(env.GOOGLE_CLIENT_SECRET, 'GOOGLE_CLIENT_SECRET'),
-    googleOauthRedirectUri: required(
-      env.GOOGLE_OAUTH_REDIRECT_URI,
-      'GOOGLE_OAUTH_REDIRECT_URI'
-    ),
+    googleOauthRedirectUri: required(env.GOOGLE_OAUTH_REDIRECT_URI, 'GOOGLE_OAUTH_REDIRECT_URI'),
     googleScopes,
     googleOauthForceConsent: parseBoolean(env.GOOGLE_OAUTH_FORCE_CONSENT, false),
-    ...(env.ALLOWED_GOOGLE_USER_ID
-      ? { allowedGoogleUserId: env.ALLOWED_GOOGLE_USER_ID.trim() }
-      : {}),
-    ...(env.TOKEN_ENCRYPTION_KEY
-      ? { tokenEncryptionKey: env.TOKEN_ENCRYPTION_KEY.trim() }
-      : {}),
+    ...(env.ALLOWED_GOOGLE_USER_ID ? { allowedGoogleUserId: env.ALLOWED_GOOGLE_USER_ID.trim() } : {}),
+    ...(env.TOKEN_ENCRYPTION_KEY ? { tokenEncryptionKey: env.TOKEN_ENCRYPTION_KEY.trim() } : {}),
     ...(env.CORS_ORIGIN?.trim() ? { corsOrigin: env.CORS_ORIGIN.trim() } : {}),
     sessionTtlMs: parseNumber(env.SESSION_TTL_MS, 15 * 60 * 1000),
     authStateTtlMs: parseNumber(env.AUTH_STATE_TTL_MS, 5 * 60 * 1000),

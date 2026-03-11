@@ -8,7 +8,7 @@
     "build": "pnpm dlx wrangler deploy --dry-run",
     "deploy": "pnpm dlx wrangler deploy",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --import tsx tests/**/*.test.ts"
+    "test": "vitest run tests"
   },
   "dependencies": {
     "hono": "^4.10.6"

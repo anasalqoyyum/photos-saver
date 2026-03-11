@@ -18,17 +18,12 @@ function isSupportedSourceUrl(url: string): boolean {
   }
 }
 
-export async function fetchImageFromSource(
-  sourceUrl: string
-): Promise<FetchedImage> {
+export async function fetchImageFromSource(sourceUrl: string): Promise<FetchedImage> {
   debug('Starting image fetch.', { sourceUrl })
 
   if (!isSupportedSourceUrl(sourceUrl)) {
     warn('Rejected unsupported image URL protocol.', { sourceUrl })
-    throw new ExtensionError(
-      'INVALID_IMAGE_URL',
-      'Unsupported image URL protocol.'
-    )
+    throw new ExtensionError('INVALID_IMAGE_URL', 'Unsupported image URL protocol.')
   }
 
   let response: Response
@@ -43,10 +38,7 @@ export async function fetchImageFromSource(
       sourceUrl,
       message: error instanceof Error ? error.message : 'Unknown error'
     })
-    throw new ExtensionError(
-      'FETCH_FAILED',
-      error instanceof Error ? error.message : 'Image request failed.'
-    )
+    throw new ExtensionError('FETCH_FAILED', error instanceof Error ? error.message : 'Image request failed.')
   }
 
   if (!response.ok) {
@@ -54,10 +46,7 @@ export async function fetchImageFromSource(
       sourceUrl,
       status: response.status
     })
-    throw new ExtensionError(
-      'FETCH_FAILED',
-      `Image request failed with status ${response.status}.`
-    )
+    throw new ExtensionError('FETCH_FAILED', `Image request failed with status ${response.status}.`)
   }
 
   const contentType = response.headers.get('content-type')

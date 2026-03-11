@@ -18,10 +18,7 @@ let activeAuthFlowPromise: Promise<string> | null = null
 function getBackendBaseUrl(): string {
   const value = BACKEND_BASE_URL.trim()
   if (!value || value.includes('REPLACE_WITH_BACKEND_URL')) {
-    throw new ExtensionError(
-      'AUTH_FAILED',
-      'Backend mode is enabled but BACKEND_BASE_URL is not configured.'
-    )
+    throw new ExtensionError('AUTH_FAILED', 'Backend mode is enabled but BACKEND_BASE_URL is not configured.')
   }
 
   return value.replace(/\/$/, '')
@@ -155,10 +152,7 @@ async function refreshBackendSessionToken(session: BackendSession): Promise<Back
   }
 
   if (!response.ok) {
-    throw new ExtensionError(
-      'AUTH_FAILED',
-      `Backend auth refresh failed with status ${response.status}.`
-    )
+    throw new ExtensionError('AUTH_FAILED', `Backend auth refresh failed with status ${response.status}.`)
   }
 
   const payload = (await response.json()) as {
@@ -199,22 +193,12 @@ function launchWebAuthFlow(url: string): Promise<string> {
       redirectUrl => {
         const runtimeError = chrome.runtime.lastError
         if (runtimeError) {
-          reject(
-            new ExtensionError(
-              'AUTH_FAILED',
-              runtimeError.message || 'Backend OAuth web flow failed.'
-            )
-          )
+          reject(new ExtensionError('AUTH_FAILED', runtimeError.message || 'Backend OAuth web flow failed.'))
           return
         }
 
         if (!redirectUrl) {
-          reject(
-            new ExtensionError(
-              'AUTH_FAILED',
-              'Backend OAuth web flow did not return redirect URL.'
-            )
-          )
+          reject(new ExtensionError('AUTH_FAILED', 'Backend OAuth web flow did not return redirect URL.'))
           return
         }
 
@@ -279,10 +263,7 @@ async function ensureBackendSessionToken(): Promise<string> {
     })
 
     if (!startResponse.ok) {
-      throw new ExtensionError(
-        'AUTH_FAILED',
-        `Backend auth start failed with status ${startResponse.status}.`
-      )
+      throw new ExtensionError('AUTH_FAILED', `Backend auth start failed with status ${startResponse.status}.`)
     }
 
     const startPayload = (await startResponse.json()) as {
@@ -298,10 +279,7 @@ async function ensureBackendSessionToken(): Promise<string> {
     const redirect = new URL(redirectUrl)
     const sessionCode = redirect.searchParams.get('session_code')
     if (!sessionCode) {
-      throw new ExtensionError(
-        'AUTH_FAILED',
-        'Backend callback did not include session_code.'
-      )
+      throw new ExtensionError('AUTH_FAILED', 'Backend callback did not include session_code.')
     }
 
     const exchangeResponse = await fetch(`${backendBaseUrl}/v1/auth/exchange`, {
@@ -315,10 +293,7 @@ async function ensureBackendSessionToken(): Promise<string> {
     })
 
     if (!exchangeResponse.ok) {
-      throw new ExtensionError(
-        'AUTH_FAILED',
-        `Backend auth exchange failed with status ${exchangeResponse.status}.`
-      )
+      throw new ExtensionError('AUTH_FAILED', `Backend auth exchange failed with status ${exchangeResponse.status}.`)
     }
 
     const exchangePayload = (await exchangeResponse.json()) as {
@@ -351,7 +326,7 @@ async function ensureBackendSessionToken(): Promise<string> {
   }
 }
 
-async function uploadOnce(image: FetchedImage, token: string): Promise<void> {
+async function uploadOnce(image: FetchedImage, token: string, pageUrl?: string): Promise<void> {
   const backendBaseUrl = getBackendBaseUrl()
   const response = await fetch(`${backendBaseUrl}/v1/photos/upload`, {
     method: 'POST',
@@ -363,34 +338,28 @@ async function uploadOnce(image: FetchedImage, token: string): Promise<void> {
       imageBase64: arrayBufferToBase64(image.bytes),
       fileName: image.fileName,
       sourceUrl: image.sourceUrl,
-      contentType: image.contentType
+      contentType: image.contentType,
+      pageUrl: pageUrl?.trim() || null
     })
   })
 
   if (response.status === 401) {
-    throw new ExtensionError(
-      'AUTH_FAILED',
-      'Backend session is invalid or expired.'
-    )
+    throw new ExtensionError('AUTH_FAILED', 'Backend session is invalid or expired.')
   }
 
   if (!response.ok) {
     const text = await response.text()
-    throw new ExtensionError(
-      'UPLOAD_FAILED',
-      `Backend upload failed (${response.status}): ${text.slice(0, 300)}`
-    )
+    throw new ExtensionError('UPLOAD_FAILED', `Backend upload failed (${response.status}): ${text.slice(0, 300)}`)
   }
 }
 
-export async function uploadImageViaBackend(image: FetchedImage): Promise<void> {
+export async function uploadImageViaBackend(image: FetchedImage, pageUrl?: string): Promise<void> {
   const sessionToken = await ensureBackendSessionToken()
 
   try {
-    await uploadOnce(image, sessionToken)
+    await uploadOnce(image, sessionToken, pageUrl)
   } catch (error) {
-    const isAuthError =
-      error instanceof ExtensionError && error.code === 'AUTH_FAILED'
+    const isAuthError = error instanceof ExtensionError && error.code === 'AUTH_FAILED'
     if (!isAuthError) {
       throw error
     }
@@ -399,6 +368,6 @@ export async function uploadImageViaBackend(image: FetchedImage): Promise<void> 
     backendSession = null
     await persistBackendSession(null)
     const refreshedToken = await ensureBackendSessionToken()
-    await uploadOnce(image, refreshedToken)
+    await uploadOnce(image, refreshedToken, pageUrl)
   }
 }

@@ -17,7 +17,7 @@ export function parseBearerToken(authorizationHeader: string | undefined): strin
   return token.trim() || null
 }
 
-export async function readJsonBody(request: Request): Promise<unknown | null> {
+export async function readJsonBody(request: Request): Promise<unknown> {
   try {
     return await request.json()
   } catch {
@@ -34,11 +34,7 @@ export function jsonResponse(payload: unknown, status = 200): Response {
   })
 }
 
-export function errorResponse(
-  status: number,
-  error: string,
-  extras: Record<string, unknown> = {}
-): Response {
+export function errorResponse(status: number, error: string, extras: Record<string, unknown> = {}): Response {
   return jsonResponse(
     {
       error,

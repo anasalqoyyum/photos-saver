@@ -23,9 +23,7 @@ export interface AppStores {
   googleTokenStore: GoogleTokenStore
 }
 
-function hasCloudflareBindings(
-  bindings?: WorkerBindings
-): bindings is WorkerBindings & {
+function hasCloudflareBindings(bindings?: WorkerBindings): bindings is WorkerBindings & {
   AUTH_KV: NonNullable<WorkerBindings['AUTH_KV']>
   APP_DB: NonNullable<WorkerBindings['APP_DB']>
 } {
@@ -41,18 +39,13 @@ function createInMemoryStores(): AppStores {
   }
 }
 
-export async function createStoresForRuntime(
-  config: AppConfig,
-  bindings?: WorkerBindings
-): Promise<AppStores> {
+export async function createStoresForRuntime(config: AppConfig, bindings?: WorkerBindings): Promise<AppStores> {
   if (!hasCloudflareBindings(bindings)) {
     return createInMemoryStores()
   }
 
   if (!config.tokenEncryptionKey) {
-    throw new Error(
-      'TOKEN_ENCRYPTION_KEY is required when AUTH_KV and APP_DB bindings are configured.'
-    )
+    throw new Error('TOKEN_ENCRYPTION_KEY is required when AUTH_KV and APP_DB bindings are configured.')
   }
 
   const cipher = await TokenCipher.fromSecret(config.tokenEncryptionKey)

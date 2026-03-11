@@ -26,17 +26,11 @@ function getOAuthConfigFromManifest(): OAuthConfig {
 
   const extensionClientId = manifest.oauth2?.client_id?.trim()
   if (!extensionClientId || extensionClientId.startsWith('REPLACE_WITH_')) {
-    throw new ExtensionError(
-      'AUTH_FAILED',
-      'OAuth client_id is missing in manifest.json.'
-    )
+    throw new ExtensionError('AUTH_FAILED', 'OAuth client_id is missing in manifest.json.')
   }
 
   const webAuthClientIdRaw = WEB_OAUTH_CLIENT_ID.trim()
-  const webAuthClientId =
-    webAuthClientIdRaw && !webAuthClientIdRaw.startsWith('REPLACE_WITH_')
-      ? webAuthClientIdRaw
-      : extensionClientId
+  const webAuthClientId = webAuthClientIdRaw && !webAuthClientIdRaw.startsWith('REPLACE_WITH_') ? webAuthClientIdRaw : extensionClientId
 
   const scopes = manifest.oauth2?.scopes ?? []
   if (!Array.isArray(scopes) || scopes.length === 0) {
@@ -66,10 +60,7 @@ async function createPkcePair(): Promise<{
   const verifierBytes = crypto.getRandomValues(new Uint8Array(32))
   const codeVerifier = toBase64Url(verifierBytes)
 
-  const verifierHash = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(codeVerifier)
-  )
+  const verifierHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(codeVerifier))
 
   const codeChallenge = toBase64Url(new Uint8Array(verifierHash))
 
@@ -93,19 +84,12 @@ function launchWebAuthFlow(authUrl: string): Promise<string> {
       redirectUrl => {
         const runtimeError = chrome.runtime.lastError
         if (runtimeError) {
-          reject(
-            new ExtensionError(
-              'AUTH_FAILED',
-              runtimeError.message || 'OAuth web flow failed.'
-            )
-          )
+          reject(new ExtensionError('AUTH_FAILED', runtimeError.message || 'OAuth web flow failed.'))
           return
         }
 
         if (!redirectUrl) {
-          reject(
-            new ExtensionError('AUTH_FAILED', 'OAuth web flow returned no redirect URL.')
-          )
+          reject(new ExtensionError('AUTH_FAILED', 'OAuth web flow returned no redirect URL.'))
           return
         }
 
@@ -160,20 +144,14 @@ async function exchangeCodeForToken(params: {
       description: providerDescription.slice(0, 300)
     })
 
-    if (
-      providerError === 'invalid_client' &&
-      providerDescription.toLowerCase().includes('client_secret')
-    ) {
+    if (providerError === 'invalid_client' && providerDescription.toLowerCase().includes('client_secret')) {
       throw new ExtensionError(
         'AUTH_FAILED',
         'OAuth token exchange requires client_secret for this client. Use a Chrome Extension OAuth client ID for PKCE fallback, or leave WEB_OAUTH_CLIENT_ID as placeholder to reuse manifest oauth2.client_id.'
       )
     }
 
-    throw new ExtensionError(
-      'AUTH_FAILED',
-      `OAuth token exchange failed (${providerError}): ${providerDescription}`
-    )
+    throw new ExtensionError('AUTH_FAILED', `OAuth token exchange failed (${providerError}): ${providerDescription}`)
   }
 
   const payload = (await response.json()) as {
@@ -185,10 +163,7 @@ async function exchangeCodeForToken(params: {
     throw new ExtensionError('AUTH_FAILED', 'OAuth token response did not include access_token.')
   }
 
-  const expiresAt =
-    typeof payload.expires_in === 'number'
-      ? Date.now() + payload.expires_in * 1000
-      : undefined
+  const expiresAt = typeof payload.expires_in === 'number' ? Date.now() + payload.expires_in * 1000 : undefined
 
   if (typeof expiresAt === 'number') {
     return {

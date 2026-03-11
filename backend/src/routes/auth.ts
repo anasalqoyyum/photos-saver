@@ -1,23 +1,7 @@
 import { AppConfig } from '../config.js'
-import {
-  emptyResponse,
-  errorResponse,
-  jsonResponse,
-  parseBearerToken,
-  readJsonBody,
-  redirectResponse
-} from '../http.js'
-import {
-  AuthStateStore,
-  ExchangeCodeStore,
-  GoogleTokenStore,
-  SessionStore
-} from '../store.js'
-import {
-  buildGoogleAuthUrl,
-  exchangeGoogleAuthCode,
-  extractGoogleUserId
-} from '../services/google-oauth.js'
+import { emptyResponse, errorResponse, jsonResponse, parseBearerToken, readJsonBody, redirectResponse } from '../http.js'
+import { buildGoogleAuthUrl, exchangeGoogleAuthCode, extractGoogleUserId } from '../services/google-oauth.js'
+import { AuthStateStore, ExchangeCodeStore, GoogleTokenStore, SessionStore } from '../store.js'
 
 export interface AuthRoutesOptions {
   config: AppConfig
@@ -59,10 +43,7 @@ function withParam(baseUrl: string, key: string, value: string): string {
   return url.toString()
 }
 
-export async function handleAuthStart(
-  request: Request,
-  options: AuthRoutesOptions
-): Promise<Response> {
+export async function handleAuthStart(request: Request, options: AuthRoutesOptions): Promise<Response> {
   const body = await readJsonBody(request)
   const extensionRedirectUri = readStringField(body, 'extensionRedirectUri')?.trim()
 
@@ -90,10 +71,7 @@ export async function handleAuthStart(
   })
 }
 
-export async function handleAuthCallback(
-  request: Request,
-  options: AuthRoutesOptions
-): Promise<Response> {
+export async function handleAuthCallback(request: Request, options: AuthRoutesOptions): Promise<Response> {
   const url = new URL(request.url)
 
   const providerError = url.searchParams.get('error')
@@ -143,20 +121,12 @@ export async function handleAuthCallback(
     updatedAt: Date.now()
   })
 
-  const exchangeCode = await options.exchangeCodeStore.create(
-    userId,
-    options.config.exchangeCodeTtlMs
-  )
+  const exchangeCode = await options.exchangeCodeStore.create(userId, options.config.exchangeCodeTtlMs)
 
-  return redirectResponse(
-    withParam(authState.extensionRedirectUri, 'session_code', exchangeCode.code)
-  )
+  return redirectResponse(withParam(authState.extensionRedirectUri, 'session_code', exchangeCode.code))
 }
 
-export async function handleAuthExchange(
-  request: Request,
-  options: AuthRoutesOptions
-): Promise<Response> {
+export async function handleAuthExchange(request: Request, options: AuthRoutesOptions): Promise<Response> {
   const body = await readJsonBody(request)
   const sessionCode = readStringField(body, 'sessionCode')?.trim()
 
@@ -169,10 +139,7 @@ export async function handleAuthExchange(
     return errorResponse(401, 'INVALID_OR_EXPIRED_SESSION_CODE')
   }
 
-  const session = await options.sessionStore.create(
-    exchangeCode.userId,
-    options.config.sessionTtlMs
-  )
+  const session = await options.sessionStore.create(exchangeCode.userId, options.config.sessionTtlMs)
 
   return jsonResponse({
     sessionToken: session.token,
@@ -180,10 +147,7 @@ export async function handleAuthExchange(
   })
 }
 
-export async function handleAuthRefresh(
-  request: Request,
-  options: AuthRoutesOptions
-): Promise<Response> {
+export async function handleAuthRefresh(request: Request, options: AuthRoutesOptions): Promise<Response> {
   const token = parseBearerToken(request.headers.get('authorization') || undefined)
   if (!token) {
     return errorResponse(401, 'MISSING_AUTHORIZATION')
@@ -194,10 +158,7 @@ export async function handleAuthRefresh(
     return errorResponse(401, 'INVALID_OR_EXPIRED_SESSION')
   }
 
-  const refreshedSession = await options.sessionStore.create(
-    existingSession.userId,
-    options.config.sessionTtlMs
-  )
+  const refreshedSession = await options.sessionStore.create(existingSession.userId, options.config.sessionTtlMs)
   await options.sessionStore.revoke(token)
 
   return jsonResponse({
@@ -206,10 +167,7 @@ export async function handleAuthRefresh(
   })
 }
 
-export async function handleAuthLogout(
-  request: Request,
-  options: AuthRoutesOptions
-): Promise<Response> {
+export async function handleAuthLogout(request: Request, options: AuthRoutesOptions): Promise<Response> {
   const token = parseBearerToken(request.headers.get('authorization') || undefined)
   if (!token) {
     return errorResponse(401, 'MISSING_AUTHORIZATION')

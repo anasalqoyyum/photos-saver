@@ -1,14 +1,15 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { describe, expect, it } from 'vitest'
 
-import { parseBearerToken } from '../src/http.ts'
+import { parseBearerToken } from '../src/http.js'
 
-test('parseBearerToken returns token for valid bearer header', () => {
-  assert.equal(parseBearerToken('Bearer abc123'), 'abc123')
-})
+describe('parseBearerToken', () => {
+  it('returns token for valid bearer header', () => {
+    expect(parseBearerToken('Bearer abc123')).toBe('abc123')
+  })
 
-test('parseBearerToken rejects malformed headers', () => {
-  assert.equal(parseBearerToken('Token abc123'), null)
-  assert.equal(parseBearerToken('Bearer'), null)
-  assert.equal(parseBearerToken(undefined), null)
+  it('rejects malformed headers', () => {
+    expect(parseBearerToken('Token abc123')).toBe(null)
+    expect(parseBearerToken('Bearer')).toBe(null)
+    expect(parseBearerToken(undefined)).toBe(null)
+  })
 })

@@ -1,10 +1,4 @@
-export type ExtensionErrorCode =
-  | 'INVALID_IMAGE_URL'
-  | 'AUTH_FAILED'
-  | 'FETCH_FAILED'
-  | 'UPLOAD_FAILED'
-  | 'CREATE_FAILED'
-  | 'UNKNOWN'
+export type ExtensionErrorCode = 'INVALID_IMAGE_URL' | 'AUTH_FAILED' | 'FETCH_FAILED' | 'UPLOAD_FAILED' | 'CREATE_FAILED' | 'UNKNOWN'
 
 export class ExtensionError extends Error {
   public readonly code: ExtensionErrorCode

@@ -1,11 +1,6 @@
-import {
-  AuthStateRecord,
-  ExchangeCodeRecord,
-  SessionRecord,
-  StoredGoogleTokens
-} from './types.js'
 import { bytesToBase64Url } from './base64.js'
 import { TokenCipher } from './token-crypto.js'
+import { AuthStateRecord, ExchangeCodeRecord, SessionRecord, StoredGoogleTokens } from './types.js'
 import { D1DatabaseLike, KVNamespaceLike } from './worker-bindings.js'
 
 export interface AuthStateStore {
@@ -256,10 +251,7 @@ export class D1AuthStateStore implements AuthStateStore {
   constructor(private readonly db: D1DatabaseLike) {}
 
   async create(state: AuthStateRecord): Promise<void> {
-    await this.db
-      .prepare('DELETE FROM auth_states WHERE expires_at <= ?1')
-      .bind(now())
-      .run()
+    await this.db.prepare('DELETE FROM auth_states WHERE expires_at <= ?1').bind(now()).run()
 
     await this.db
       .prepare(
@@ -304,10 +296,7 @@ export class D1ExchangeCodeStore implements ExchangeCodeStore {
   constructor(private readonly db: D1DatabaseLike) {}
 
   async create(userId: string, ttlMs: number): Promise<ExchangeCodeRecord> {
-    await this.db
-      .prepare('DELETE FROM exchange_codes WHERE expires_at <= ?1')
-      .bind(now())
-      .run()
+    await this.db.prepare('DELETE FROM exchange_codes WHERE expires_at <= ?1').bind(now()).run()
 
     const createdAt = now()
     const record: ExchangeCodeRecord = {
@@ -413,12 +402,7 @@ export class D1GoogleTokenStore implements GoogleTokenStore {
            scope = excluded.scope,
            updated_at = excluded.updated_at`
       )
-      .bind(
-        record.userId,
-        encryptedRefreshToken,
-        record.scope || null,
-        record.updatedAt
-      )
+      .bind(record.userId, encryptedRefreshToken, record.scope || null, record.updatedAt)
       .run()
   }
 

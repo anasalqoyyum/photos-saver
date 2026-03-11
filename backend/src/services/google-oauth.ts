@@ -1,5 +1,5 @@
-import { AppConfig } from '../config.js'
 import { base64UrlToBytes } from '../base64.js'
+import { AppConfig } from '../config.js'
 import { GoogleTokenResponse } from '../types.js'
 
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
@@ -27,10 +27,7 @@ function toGoogleTokenErrorMessage(payload: GoogleTokenResponse): string {
   return 'unknown_error'
 }
 
-export function buildGoogleAuthUrl(params: {
-  config: AppConfig
-  state: string
-}): string {
+export function buildGoogleAuthUrl(params: { config: AppConfig; state: string }): string {
   const url = new URL(GOOGLE_AUTH_URL)
   url.searchParams.set('client_id', params.config.googleClientId)
   url.searchParams.set('redirect_uri', params.config.googleOauthRedirectUri)
@@ -45,10 +42,7 @@ export function buildGoogleAuthUrl(params: {
   return url.toString()
 }
 
-export async function exchangeGoogleAuthCode(params: {
-  config: AppConfig
-  code: string
-}): Promise<GoogleTokenResponse> {
+export async function exchangeGoogleAuthCode(params: { config: AppConfig; code: string }): Promise<GoogleTokenResponse> {
   const body = new URLSearchParams({
     client_id: params.config.googleClientId,
     client_secret: params.config.googleClientSecret,
@@ -73,10 +67,7 @@ export async function exchangeGoogleAuthCode(params: {
   return payload
 }
 
-export async function refreshGoogleAccessToken(params: {
-  config: AppConfig
-  refreshToken: string
-}): Promise<GoogleTokenResponse> {
+export async function refreshGoogleAccessToken(params: { config: AppConfig; refreshToken: string }): Promise<GoogleTokenResponse> {
   const body = new URLSearchParams({
     client_id: params.config.googleClientId,
     client_secret: params.config.googleClientSecret,
