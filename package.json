@@ -11,6 +11,7 @@
     "backend:dev": "pnpm --filter photos-saver-backend dev",
     "backend:build": "pnpm --filter photos-saver-backend run build",
     "backend:deploy": "pnpm --filter photos-saver-backend run deploy",
+    "backend:deploy:version": "pnpm --filter photos-saver-backend run deploy:version",
     "backend:typecheck": "pnpm --filter photos-saver-backend typecheck",
     "backend:test": "pnpm --filter photos-saver-backend test",
     "fmt": "oxfmt",
