@@ -69,12 +69,8 @@ function extensionFromMime(contentType: string | null): string | null {
 }
 
 export function sanitizeFilename(name: string): string {
-  let noControlChars = ''
-  for (const char of name) {
-    if (char.charCodeAt(0) >= 32) {
-      noControlChars += char
-    }
-  }
+  // Strip ASCII control characters (code points 0–31) to avoid quadratic-time concatenation in a loop.
+  const noControlChars = name.replace(/[\x00-\x1F]/g, '')
 
   const cleaned = noControlChars.replace(ILLEGAL_FILENAME_CHARS, '_').replace(LEADING_DOTS, '').trim()
 
