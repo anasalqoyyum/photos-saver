@@ -1,6 +1,6 @@
-# Save to Google Photos (Chrome Extension)
+# Save to Google Photos Extension
 
-Chrome extension that adds a right-click menu item on images:
+Browser extension that adds a right-click menu item on images:
 
 - `Save to Google Photos`
 
@@ -19,7 +19,7 @@ When clicked, it uploads the original image bytes to Google Photos with:
 
 ## Project structure
 
-- `manifest.json` - MV3 extension manifest.
+- `manifest.json` - shared MV3 extension manifest for Chrome and Firefox.
 - `src/sw.ts` - service worker entrypoint.
 - `src/auth.ts` - OAuth token handling.
 - `src/image-fetch.ts` - source image download logic.
@@ -29,6 +29,7 @@ When clicked, it uploads the original image bytes to Google Photos with:
 - `src/notify.ts` - success/failure notifications.
 - `src/backend-api.ts` - backend auth + upload client.
 - `src/backend-config.ts` - backend mode toggle and base URL.
+- `src/oauth-config.ts` - browser-specific OAuth client overrides.
 - `backend/` - Cloudflare Workers backend (Hono).
 - `docs/setup-google-oauth.md` - OAuth and Google Cloud setup.
 - `docs/setup-backend-workers.md` - backend mode setup.
@@ -40,7 +41,7 @@ When clicked, it uploads the original image bytes to Google Photos with:
    - `pnpm install`
 3. Build TypeScript to `dist/`:
    - `pnpm build`
-4. Load unpacked extension in `chrome://extensions`.
+4. Load unpacked extension in `chrome://extensions` or `about:debugging#/runtime/this-firefox`.
 
 ## Backend mode (optional)
 
@@ -66,6 +67,7 @@ When clicked, it uploads the original image bytes to Google Photos with:
 
 - Chrome: uses `chrome.identity.getAuthToken` first.
 - ungoogled-chromium: if `getAuthToken` fails or times out, extension falls back to OAuth PKCE via `chrome.identity.launchWebAuthFlow`.
+- Firefox: uses OAuth PKCE via `chrome.identity.launchWebAuthFlow`; set `FIREFOX_WEB_OAUTH_CLIENT_ID` in `src/oauth-config.ts` before authenticating.
 - PKCE fallback reuses `manifest.json` `oauth2.client_id` by default; optional override is available in `src/oauth-config.ts`.
 - Backend mode avoids browser-specific OAuth implementation differences by delegating auth and Google API calls to Worker backend endpoints.
 

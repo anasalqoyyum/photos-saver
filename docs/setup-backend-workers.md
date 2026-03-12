@@ -69,6 +69,8 @@ Edit `src/backend-config.ts`:
 - set `BACKEND_MODE_ENABLED = true`
 - set `BACKEND_BASE_URL` to your deployed Worker URL
 
+If you need to customize which extension redirect hosts the backend accepts, edit `backend/src/extension-config.ts`.
+
 ## Runtime notes
 
 - Backend uses KV for sessions and D1 for OAuth artifacts and encrypted refresh tokens.

@@ -77,7 +77,10 @@ function isOriginAllowed(origin: string, config: CorsOriginConfig): boolean {
   })
 }
 
-function corsOriginValue(origin: string, config: CorsOriginConfig): string | undefined {
+function corsOriginValue(
+  origin: string,
+  config: CorsOriginConfig
+): string | undefined {
   if (!origin) {
     return config === true ? '*' : undefined
   }
@@ -111,7 +114,11 @@ export async function buildApp(config: AppConfig = loadConfig(), bindings?: Work
 
   app.use('*', async (c, next) => {
     const origin = c.req.header('origin')
-    if (c.req.method === 'OPTIONS' && origin && !isOriginAllowed(origin, corsConfig)) {
+    if (
+      c.req.method === 'OPTIONS' &&
+      origin &&
+      !isOriginAllowed(origin, corsConfig)
+    ) {
       return errorResponse(403, 'CORS_ORIGIN_NOT_ALLOWED')
     }
 
@@ -144,7 +151,9 @@ export async function buildApp(config: AppConfig = loadConfig(), bindings?: Work
   app.post('/v1/auth/exchange', c => handleAuthExchange(c.req.raw, authOptions))
   app.post('/v1/auth/refresh', c => handleAuthRefresh(c.req.raw, authOptions))
   app.post('/v1/auth/logout', c => handleAuthLogout(c.req.raw, authOptions))
-  app.post('/v1/photos/upload', c => handlePhotoUpload(c.req.raw, photosOptions))
+  app.post('/v1/photos/upload', c =>
+    handlePhotoUpload(c.req.raw, photosOptions)
+  )
 
   app.notFound(() => errorResponse(404, 'NOT_FOUND'))
 

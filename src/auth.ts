@@ -4,6 +4,11 @@ import { getAccessTokenViaWebAuthFlow } from './oauth-web-flow.js'
 
 type AuthTokenResult = chrome.identity.GetAuthTokenResult
 
+type IdentityApi = typeof chrome.identity & {
+  getAuthToken?: typeof chrome.identity.getAuthToken
+  removeCachedAuthToken?: typeof chrome.identity.removeCachedAuthToken
+}
+
 interface CachedToken {
   token: string
   expiresAt?: number
@@ -12,6 +17,10 @@ interface CachedToken {
 const TOKEN_EXPIRY_SKEW_MS = 30_000
 
 let pkceTokenCache: CachedToken | null = null
+
+function getIdentityApi(): IdentityApi {
+  return chrome.identity as IdentityApi
+}
 
 function isLikelyGoogleChrome(): boolean {
   const navWithUaData = navigator as Navigator & {
@@ -34,8 +43,18 @@ function isLikelyGoogleChrome(): boolean {
 function getAuthToken(details: chrome.identity.TokenDetails): Promise<AuthTokenResult> {
   debug('Requesting OAuth token.', { interactive: !!details.interactive })
 
+  const identity = getIdentityApi()
+  if (typeof identity.getAuthToken !== 'function') {
+    return Promise.reject(
+      new ExtensionError(
+        'AUTH_FAILED',
+        'Browser does not support chrome.identity.getAuthToken.'
+      )
+    )
+  }
+
   return new Promise((resolve, reject) => {
-    chrome.identity.getAuthToken(details, tokenOrResult => {
+    identity.getAuthToken(details, tokenOrResult => {
       const runtimeError = chrome.runtime.lastError
       if (runtimeError) {
         warn('OAuth token request failed.', {
@@ -71,7 +90,14 @@ function getAuthToken(details: chrome.identity.TokenDetails): Promise<AuthTokenR
   })
 }
 
-function getAuthTokenWithTimeout(details: chrome.identity.TokenDetails, timeoutMs: number): Promise<AuthTokenResult> {
+function supportsChromeIdentityTokenFlow(): boolean {
+  return isLikelyGoogleChrome() && typeof getIdentityApi().getAuthToken === 'function'
+}
+
+function getAuthTokenWithTimeout(
+  details: chrome.identity.TokenDetails,
+  timeoutMs: number
+): Promise<AuthTokenResult> {
   return new Promise((resolve, reject) => {
     const timeoutHandle = setTimeout(() => {
       reject(new ExtensionError('AUTH_FAILED', 'Timed out while requesting OAuth token.'))
@@ -103,11 +129,27 @@ function getCachedPkceToken(): string | null {
   return pkceTokenCache.token
 }
 
+async function getAccessTokenViaPkce(): Promise<string> {
+  const pkceToken = await getAccessTokenViaWebAuthFlow()
+  pkceTokenCache =
+    typeof pkceToken.expiresAt === 'number'
+      ? { token: pkceToken.accessToken, expiresAt: pkceToken.expiresAt }
+      : { token: pkceToken.accessToken }
+
+  debug('Using PKCE token acquired via web auth flow.')
+  return pkceToken.accessToken
+}
+
 export async function getAccessToken(): Promise<string> {
   const cachedPkceToken = getCachedPkceToken()
   if (cachedPkceToken) {
     debug('Using cached PKCE token.')
     return cachedPkceToken
+  }
+
+  if (!supportsChromeIdentityTokenFlow()) {
+    debug('Chrome identity token flow unavailable; using PKCE web auth flow.')
+    return getAccessTokenViaPkce()
   }
 
   try {
@@ -120,18 +162,6 @@ export async function getAccessToken(): Promise<string> {
     warn('Non-interactive token unavailable, falling back to interactive.', {
       message: error instanceof Error ? error.message : 'Unknown error'
     })
-  }
-
-  if (!isLikelyGoogleChrome()) {
-    debug('Browser does not appear to be Google Chrome; skipping identity interactive flow.')
-    const pkceToken = await getAccessTokenViaWebAuthFlow()
-    pkceTokenCache =
-      typeof pkceToken.expiresAt === 'number'
-        ? { token: pkceToken.accessToken, expiresAt: pkceToken.expiresAt }
-        : { token: pkceToken.accessToken }
-
-    debug('Using PKCE token acquired via web auth flow.')
-    return pkceToken.accessToken
   }
 
   try {
@@ -149,14 +179,7 @@ export async function getAccessToken(): Promise<string> {
     })
   }
 
-  const pkceToken = await getAccessTokenViaWebAuthFlow()
-  pkceTokenCache =
-    typeof pkceToken.expiresAt === 'number'
-      ? { token: pkceToken.accessToken, expiresAt: pkceToken.expiresAt }
-      : { token: pkceToken.accessToken }
-
-  debug('Using PKCE token acquired via web auth flow.')
-  return pkceToken.accessToken
+  return getAccessTokenViaPkce()
 }
 
 export async function invalidateToken(token: string): Promise<void> {
@@ -165,8 +188,14 @@ export async function invalidateToken(token: string): Promise<void> {
   }
 
   debug('Invalidating cached OAuth token.')
+  const identity = getIdentityApi()
+  if (typeof identity.removeCachedAuthToken !== 'function') {
+    debug('Browser does not support chrome.identity.removeCachedAuthToken; skipping.')
+    return
+  }
+
   try {
-    await chrome.identity.removeCachedAuthToken({ token })
+    await identity.removeCachedAuthToken({ token })
   } catch (error) {
     warn('Failed to invalidate chrome.identity token cache.', {
       message: error instanceof Error ? error.message : 'Unknown error'
