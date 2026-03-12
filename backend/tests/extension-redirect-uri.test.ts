@@ -1,16 +1,17 @@
-import assert from 'node:assert/strict'
-import test from 'node:test'
+import { describe, expect, it } from 'vitest'
 
 import { isValidExtensionRedirectUri } from '../src/extension-redirect-uri.js'
 
-test('isValidExtensionRedirectUri accepts chromium and firefox redirect hosts', () => {
-  assert.equal(isValidExtensionRedirectUri('https://abc123.chromiumapp.org/'), true)
-  assert.equal(isValidExtensionRedirectUri('https://save-to-google-photos.example.extensions.allizom.org/'), true)
-  assert.equal(isValidExtensionRedirectUri('https://save-to-google-photos.example.extensions.mozilla.org/'), true)
-})
+describe('isValidExtensionRedirectUri', () => {
+  it('accepts chromium and firefox redirect hosts', () => {
+    expect(isValidExtensionRedirectUri('https://abc123.chromiumapp.org/')).toBe(true)
+    expect(isValidExtensionRedirectUri('https://save-to-google-photos.example.extensions.allizom.org/')).toBe(true)
+    expect(isValidExtensionRedirectUri('https://save-to-google-photos.example.extensions.mozilla.org/')).toBe(true)
+  })
 
-test('isValidExtensionRedirectUri rejects invalid protocols and hosts', () => {
-  assert.equal(isValidExtensionRedirectUri('http://abc123.chromiumapp.org/'), false)
-  assert.equal(isValidExtensionRedirectUri('https://example.com/callback'), false)
-  assert.equal(isValidExtensionRedirectUri('not-a-url'), false)
+  it('rejects invalid protocols and hosts', () => {
+    expect(isValidExtensionRedirectUri('http://abc123.chromiumapp.org/')).toBe(false)
+    expect(isValidExtensionRedirectUri('https://example.com/callback')).toBe(false)
+    expect(isValidExtensionRedirectUri('not-a-url')).toBe(false)
+  })
 })
