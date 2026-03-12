@@ -1,24 +1,8 @@
 import { AppConfig } from '../config.js'
 import { isValidExtensionRedirectUri } from '../extension-redirect-uri.js'
-import {
-  emptyResponse,
-  errorResponse,
-  jsonResponse,
-  parseBearerToken,
-  readJsonBody,
-  redirectResponse
-} from '../http.js'
-import {
-  AuthStateStore,
-  ExchangeCodeStore,
-  GoogleTokenStore,
-  SessionStore
-} from '../store.js'
-import {
-  buildGoogleAuthUrl,
-  exchangeGoogleAuthCode,
-  extractGoogleUserId
-} from '../services/google-oauth.js'
+import { emptyResponse, errorResponse, jsonResponse, parseBearerToken, readJsonBody, redirectResponse } from '../http.js'
+import { buildGoogleAuthUrl, exchangeGoogleAuthCode, extractGoogleUserId } from '../services/google-oauth.js'
+import { AuthStateStore, ExchangeCodeStore, GoogleTokenStore, SessionStore } from '../store.js'
 
 export interface AuthRoutesOptions {
   config: AppConfig

@@ -4,14 +4,8 @@ import test from 'node:test'
 import { isFirefoxRedirectUri } from '../src/oauth-web-flow.ts'
 
 test('isFirefoxRedirectUri detects Firefox extension redirect domains', () => {
-  assert.equal(
-    isFirefoxRedirectUri('https://save-to-google-photos.example.extensions.mozilla.org/'),
-    true
-  )
-  assert.equal(
-    isFirefoxRedirectUri('https://save-to-google-photos.example.extensions.allizom.org/'),
-    true
-  )
+  assert.equal(isFirefoxRedirectUri('https://save-to-google-photos.example.extensions.mozilla.org/'), true)
+  assert.equal(isFirefoxRedirectUri('https://save-to-google-photos.example.extensions.allizom.org/'), true)
 })
 
 test('isFirefoxRedirectUri rejects chromium and non-extension URLs', () => {

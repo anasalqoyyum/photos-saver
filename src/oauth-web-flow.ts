@@ -30,8 +30,7 @@ export function isFirefoxRedirectUri(redirectUri: string): boolean {
     const parsed = new URL(redirectUri)
     return (
       parsed.protocol === 'https:' &&
-      (parsed.hostname.endsWith('.extensions.mozilla.org') ||
-        parsed.hostname.endsWith('.extensions.allizom.org'))
+      (parsed.hostname.endsWith('.extensions.mozilla.org') || parsed.hostname.endsWith('.extensions.allizom.org'))
     )
   } catch {
     return false
@@ -54,10 +53,7 @@ function getOAuthConfigFromManifest(redirectUri: string): OAuthConfig {
   if (isFirefoxRedirectUri(redirectUri)) {
     const firefoxWebAuthClientId = getConfiguredClientId(FIREFOX_WEB_OAUTH_CLIENT_ID)
     if (!firefoxWebAuthClientId) {
-      throw new ExtensionError(
-        'AUTH_FAILED',
-        'Firefox OAuth requires FIREFOX_WEB_OAUTH_CLIENT_ID in src/oauth-config.ts.'
-      )
+      throw new ExtensionError('AUTH_FAILED', 'Firefox OAuth requires FIREFOX_WEB_OAUTH_CLIENT_ID in src/oauth-config.ts.')
     }
 
     return {
@@ -68,10 +64,7 @@ function getOAuthConfigFromManifest(redirectUri: string): OAuthConfig {
 
   const extensionClientId = getConfiguredClientId(manifest.oauth2?.client_id)
   if (!extensionClientId) {
-    throw new ExtensionError(
-      'AUTH_FAILED',
-      'OAuth client_id is missing in manifest.json.'
-    )
+    throw new ExtensionError('AUTH_FAILED', 'OAuth client_id is missing in manifest.json.')
   }
 
   const webAuthClientId = getConfiguredClientId(WEB_OAUTH_CLIENT_ID) ?? extensionClientId
@@ -220,10 +213,7 @@ export async function getAccessTokenViaWebAuthFlow(): Promise<TokenResult> {
   const redirectUri = chrome.identity.getRedirectURL()
   const oauthConfig = getOAuthConfigFromManifest(redirectUri)
 
-  if (
-    oauthConfig.extensionClientId &&
-    oauthConfig.webAuthClientId === oauthConfig.extensionClientId
-  ) {
+  if (oauthConfig.extensionClientId && oauthConfig.webAuthClientId === oauthConfig.extensionClientId) {
     warn('PKCE flow is using extension OAuth client ID. A separate Web client ID is recommended.')
   }
 

@@ -45,12 +45,7 @@ function getAuthToken(details: chrome.identity.TokenDetails): Promise<AuthTokenR
 
   const identity = getIdentityApi()
   if (typeof identity.getAuthToken !== 'function') {
-    return Promise.reject(
-      new ExtensionError(
-        'AUTH_FAILED',
-        'Browser does not support chrome.identity.getAuthToken.'
-      )
-    )
+    return Promise.reject(new ExtensionError('AUTH_FAILED', 'Browser does not support chrome.identity.getAuthToken.'))
   }
 
   return new Promise((resolve, reject) => {
@@ -94,10 +89,7 @@ function supportsChromeIdentityTokenFlow(): boolean {
   return isLikelyGoogleChrome() && typeof getIdentityApi().getAuthToken === 'function'
 }
 
-function getAuthTokenWithTimeout(
-  details: chrome.identity.TokenDetails,
-  timeoutMs: number
-): Promise<AuthTokenResult> {
+function getAuthTokenWithTimeout(details: chrome.identity.TokenDetails, timeoutMs: number): Promise<AuthTokenResult> {
   return new Promise((resolve, reject) => {
     const timeoutHandle = setTimeout(() => {
       reject(new ExtensionError('AUTH_FAILED', 'Timed out while requesting OAuth token.'))

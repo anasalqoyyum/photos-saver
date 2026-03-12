@@ -45,7 +45,7 @@ Note: The extension ID must match the ID used in OAuth credentials.
 1. Open `APIs & Services` -> `Credentials` -> `Create credentials` -> `OAuth client ID`.
 2. Application type: `Web application`.
 3. Add Authorized redirect URI:
-    - `https://<your-extension-id>.chromiumapp.org/`
+   - `https://<your-extension-id>.chromiumapp.org/`
 4. Copy this web client ID.
 
 ## 4c) Create OAuth client for Firefox
