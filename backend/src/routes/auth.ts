@@ -1,4 +1,5 @@
 import { AppConfig } from '../config.js'
+import { isValidExtensionRedirectUri } from '../extension-redirect-uri.js'
 import { emptyResponse, errorResponse, jsonResponse, parseBearerToken, readJsonBody, redirectResponse } from '../http.js'
 import { buildGoogleAuthUrl, exchangeGoogleAuthCode, extractGoogleUserId } from '../services/google-oauth.js'
 import { AuthStateStore, ExchangeCodeStore, GoogleTokenStore, SessionStore } from '../store.js'
@@ -26,15 +27,6 @@ function readStringField(body: unknown, key: string): string | null {
   }
 
   return value
-}
-
-function isValidExtensionRedirectUri(uri: string): boolean {
-  try {
-    const parsed = new URL(uri)
-    return parsed.protocol === 'https:' && parsed.hostname.endsWith('.chromiumapp.org')
-  } catch {
-    return false
-  }
 }
 
 function withParam(baseUrl: string, key: string, value: string): string {

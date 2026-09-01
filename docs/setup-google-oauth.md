@@ -1,4 +1,4 @@
-# Google OAuth Setup for Chrome Extension
+# Google OAuth Setup for Chrome and Firefox
 
 This extension uses the Google Photos Library API with the OAuth scope:
 
@@ -48,6 +48,14 @@ Note: The extension ID must match the ID used in OAuth credentials.
    - `https://<your-extension-id>.chromiumapp.org/`
 4. Copy this web client ID.
 
+## 4c) Create OAuth client for Firefox
+
+1. Open `APIs & Services` -> `Credentials` -> `Create credentials` -> `OAuth client ID`.
+2. Application type: `Web application`.
+3. Add Authorized redirect URI using the Firefox runtime redirect host:
+   - `https://save-to-google-photos.example.extensions.mozilla.org/`
+4. Copy this web client ID.
+
 ## 5) Update manifest
 
 Edit `manifest.json`:
@@ -59,6 +67,7 @@ Edit `src/oauth-config.ts`:
 
 - Leave `WEB_OAUTH_CLIENT_ID` as placeholder to reuse `manifest.json` `oauth2.client_id` (recommended default).
 - Only set `WEB_OAUTH_CLIENT_ID` if you specifically need a separate Web OAuth client.
+- Set `FIREFOX_WEB_OAUTH_CLIENT_ID` when using Firefox.
 
 If `key` is not set, Chrome can generate different IDs in different environments, which can break OAuth Item ID matching.
 
@@ -68,8 +77,8 @@ If `key` is not set, Chrome can generate different IDs in different environments
    - `pnpm install`
 2. Transpile TypeScript:
    - `pnpm build`
-3. Open `chrome://extensions`.
-4. Click `Load unpacked` and select this repo root.
+3. Open `chrome://extensions` for Chrome or `about:debugging#/runtime/this-firefox` for Firefox.
+4. Load this repo root as the unpacked/temporary extension.
 
 ## 7) Verify auth flow
 
@@ -92,6 +101,9 @@ If `key` is not set, Chrome can generate different IDs in different environments
   - This extension automatically falls back to OAuth PKCE web flow (`launchWebAuthFlow`).
   - Ensure `manifest.json` has host permissions for `https://accounts.google.com/*` and `https://oauth2.googleapis.com/*`.
   - If using a separate web client, set it in `src/oauth-config.ts` `WEB_OAUTH_CLIENT_ID`.
+- Firefox auth fails immediately:
+  - Set `src/oauth-config.ts` `FIREFOX_WEB_OAUTH_CLIENT_ID` to a Web OAuth client.
+  - Add the Firefox redirect URI `https://save-to-google-photos.example.extensions.mozilla.org/` to that client.
 - `redirect_uri_mismatch` during PKCE fallback:
   - The redirect URI must be exactly `https://<your-extension-id>.chromiumapp.org/`.
   - In the Web OAuth client, add that exact URI under Authorized redirect URIs.

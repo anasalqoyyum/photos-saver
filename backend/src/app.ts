@@ -24,9 +24,10 @@ type CorsOriginConfig = true | string | Array<string | RegExp>
 const LOCAL_ORIGIN_PATTERNS = [/^http:\/\/localhost(?::\d+)?$/, /^http:\/\/127\.0\.0\.1(?::\d+)?$/]
 
 const EXTENSION_ORIGIN_PATTERN = /^chrome-extension:\/\/[a-p]{32}$/
+const MOZ_EXTENSION_ORIGIN_PATTERN = /^moz-extension:\/\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 function defaultCorsOrigins(): RegExp[] {
-  return [...LOCAL_ORIGIN_PATTERNS, EXTENSION_ORIGIN_PATTERN]
+  return [...LOCAL_ORIGIN_PATTERNS, EXTENSION_ORIGIN_PATTERN, MOZ_EXTENSION_ORIGIN_PATTERN]
 }
 
 function parseCorsOrigin(corsOrigin: string | undefined): CorsOriginConfig {

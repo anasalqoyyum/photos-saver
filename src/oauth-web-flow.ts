@@ -1,12 +1,12 @@
 import { ExtensionError } from './errors.js'
 import { debug, warn } from './logger.js'
-import { WEB_OAUTH_CLIENT_ID } from './oauth-config.js'
+import { FIREFOX_WEB_OAUTH_CLIENT_ID, WEB_OAUTH_CLIENT_ID } from './oauth-config.js'
 
 const AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth'
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
 
 interface OAuthConfig {
-  extensionClientId: string
+  extensionClientId?: string
   webAuthClientId: string
   scopes: string[]
 }
@@ -16,7 +16,28 @@ interface TokenResult {
   expiresAt?: number
 }
 
-function getOAuthConfigFromManifest(): OAuthConfig {
+function getConfiguredClientId(value: string | undefined): string | null {
+  const trimmed = value?.trim()
+  if (!trimmed || trimmed.startsWith('REPLACE_WITH_')) {
+    return null
+  }
+
+  return trimmed
+}
+
+export function isFirefoxRedirectUri(redirectUri: string): boolean {
+  try {
+    const parsed = new URL(redirectUri)
+    return (
+      parsed.protocol === 'https:' &&
+      (parsed.hostname.endsWith('.extensions.mozilla.org') || parsed.hostname.endsWith('.extensions.allizom.org'))
+    )
+  } catch {
+    return false
+  }
+}
+
+function getOAuthConfigFromManifest(redirectUri: string): OAuthConfig {
   const manifest = chrome.runtime.getManifest() as chrome.runtime.Manifest & {
     oauth2?: {
       client_id?: string
@@ -24,18 +45,29 @@ function getOAuthConfigFromManifest(): OAuthConfig {
     }
   }
 
-  const extensionClientId = manifest.oauth2?.client_id?.trim()
-  if (!extensionClientId || extensionClientId.startsWith('REPLACE_WITH_')) {
-    throw new ExtensionError('AUTH_FAILED', 'OAuth client_id is missing in manifest.json.')
-  }
-
-  const webAuthClientIdRaw = WEB_OAUTH_CLIENT_ID.trim()
-  const webAuthClientId = webAuthClientIdRaw && !webAuthClientIdRaw.startsWith('REPLACE_WITH_') ? webAuthClientIdRaw : extensionClientId
-
   const scopes = manifest.oauth2?.scopes ?? []
   if (!Array.isArray(scopes) || scopes.length === 0) {
     throw new ExtensionError('AUTH_FAILED', 'OAuth scopes are missing in manifest.json.')
   }
+
+  if (isFirefoxRedirectUri(redirectUri)) {
+    const firefoxWebAuthClientId = getConfiguredClientId(FIREFOX_WEB_OAUTH_CLIENT_ID)
+    if (!firefoxWebAuthClientId) {
+      throw new ExtensionError('AUTH_FAILED', 'Firefox OAuth requires FIREFOX_WEB_OAUTH_CLIENT_ID in src/oauth-config.ts.')
+    }
+
+    return {
+      webAuthClientId: firefoxWebAuthClientId,
+      scopes
+    }
+  }
+
+  const extensionClientId = getConfiguredClientId(manifest.oauth2?.client_id)
+  if (!extensionClientId) {
+    throw new ExtensionError('AUTH_FAILED', 'OAuth client_id is missing in manifest.json.')
+  }
+
+  const webAuthClientId = getConfiguredClientId(WEB_OAUTH_CLIENT_ID) ?? extensionClientId
 
   return {
     extensionClientId,
@@ -178,10 +210,10 @@ async function exchangeCodeForToken(params: {
 }
 
 export async function getAccessTokenViaWebAuthFlow(): Promise<TokenResult> {
-  const oauthConfig = getOAuthConfigFromManifest()
   const redirectUri = chrome.identity.getRedirectURL()
+  const oauthConfig = getOAuthConfigFromManifest(redirectUri)
 
-  if (oauthConfig.webAuthClientId === oauthConfig.extensionClientId) {
+  if (oauthConfig.extensionClientId && oauthConfig.webAuthClientId === oauthConfig.extensionClientId) {
     warn('PKCE flow is using extension OAuth client ID. A separate Web client ID is recommended.')
   }
 
@@ -248,8 +280,10 @@ export async function getAccessTokenViaWebAuthFlow(): Promise<TokenResult> {
   try {
     return await runFlow(oauthConfig.webAuthClientId)
   } catch (error) {
+    const extensionClientId = oauthConfig.extensionClientId
     const shouldRetryWithExtensionClient =
-      oauthConfig.webAuthClientId !== oauthConfig.extensionClientId &&
+      !!extensionClientId &&
+      oauthConfig.webAuthClientId !== extensionClientId &&
       error instanceof ExtensionError &&
       error.message.includes('client_secret')
 
@@ -258,6 +292,6 @@ export async function getAccessTokenViaWebAuthFlow(): Promise<TokenResult> {
     }
 
     warn('Configured WEB_OAUTH_CLIENT_ID requires client secret. Retrying PKCE with extension client ID.')
-    return runFlow(oauthConfig.extensionClientId)
+    return runFlow(extensionClientId)
   }
 }
