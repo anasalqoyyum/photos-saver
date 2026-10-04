@@ -1,4 +1,4 @@
-# Google OAuth Setup for Chrome Extension
+# Google OAuth Setup for Chrome and Firefox
 
 This extension uses the Google Photos Library API with the OAuth scope:
 
@@ -48,6 +48,18 @@ Note: The extension ID must match the ID used in OAuth credentials.
    - `https://<your-extension-id>.chromiumapp.org/`
 4. Copy this web client ID.
 
+## 4c) Create OAuth client for Firefox
+
+1. Open `APIs & Services` -> `Credentials` -> `Create credentials` -> `OAuth client ID`.
+2. Application type: `Web application`.
+3. Build and temporarily load the extension in Firefox using the steps in section 6.
+4. In `about:debugging#/runtime/this-firefox`, click `Inspect` for this extension and run this in its console:
+   ```js
+   chrome.identity.getRedirectURL()
+   ```
+5. Copy the returned URL, including its trailing slash, into the client's Authorized redirect URIs. Firefox derives this URL from `browser_specific_settings.gecko.id`; keep that ID stable. See [Mozilla's redirect URL documentation](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/identity/getRedirectURL).
+6. Copy this web client ID into `FIREFOX_WEB_OAUTH_CLIENT_ID` in `src/oauth-config.ts`, then rebuild and reload the extension.
+
 ## 5) Update manifest
 
 Edit `manifest.json`:
@@ -59,6 +71,7 @@ Edit `src/oauth-config.ts`:
 
 - Leave `WEB_OAUTH_CLIENT_ID` as placeholder to reuse `manifest.json` `oauth2.client_id` (recommended default).
 - Only set `WEB_OAUTH_CLIENT_ID` if you specifically need a separate Web OAuth client.
+- Set `FIREFOX_WEB_OAUTH_CLIENT_ID` when using Firefox.
 
 If `key` is not set, Chrome can generate different IDs in different environments, which can break OAuth Item ID matching.
 
@@ -68,8 +81,8 @@ If `key` is not set, Chrome can generate different IDs in different environments
    - `pnpm install`
 2. Transpile TypeScript:
    - `pnpm build`
-3. Open `chrome://extensions`.
-4. Click `Load unpacked` and select this repo root.
+3. Open `chrome://extensions` for Chrome 121 or later, or `about:debugging#/runtime/this-firefox` for Firefox 121 or later.
+4. In Chrome, click `Load unpacked` and select this repo root. In Firefox, click `Load Temporary Add-on` and select this repo's `manifest.json`.
 
 ## 7) Verify auth flow
 
@@ -92,9 +105,12 @@ If `key` is not set, Chrome can generate different IDs in different environments
   - This extension automatically falls back to OAuth PKCE web flow (`launchWebAuthFlow`).
   - Ensure `manifest.json` has host permissions for `https://accounts.google.com/*` and `https://oauth2.googleapis.com/*`.
   - If using a separate web client, set it in `src/oauth-config.ts` `WEB_OAUTH_CLIENT_ID`.
+- Firefox auth fails immediately:
+  - Set `src/oauth-config.ts` `FIREFOX_WEB_OAUTH_CLIENT_ID` to a Web OAuth client.
+  - Inspect the extension in `about:debugging#/runtime/this-firefox`, run `chrome.identity.getRedirectURL()`, and add the returned URL to that client's Authorized redirect URIs.
 - `redirect_uri_mismatch` during PKCE fallback:
-  - The redirect URI must be exactly `https://<your-extension-id>.chromiumapp.org/`.
-  - In the Web OAuth client, add that exact URI under Authorized redirect URIs.
-  - Ensure `<your-extension-id>` matches the runtime ID shown in service worker logs.
+  - Run `chrome.identity.getRedirectURL()` in the extension's background console and add the exact returned URL to the Web OAuth client's Authorized redirect URIs.
+  - Chrome returns `https://<your-extension-id>.chromiumapp.org/`; Firefox returns a URL derived from its Gecko extension ID.
+  - Keep the extension ID stable and include the trailing slash when registering the URL.
 
 If you switch to backend mode, use `docs/setup-backend-workers.md` for Workers backend OAuth setup.
