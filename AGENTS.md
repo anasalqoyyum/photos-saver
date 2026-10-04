@@ -41,6 +41,8 @@ Place tests beside each app in `tests/` or `backend/tests/`, and name them `*.te
 
 ## Commit & Pull Request Guidelines
 
+Bump the extension version in both `manifest.json` and the root `package.json` with every extension change, following semver: patch for fixes, minor for features.
+
 Recent history follows Conventional Commits: `fix: ...`, `feat: ...`, `feat(scope): ...`, and `chore: ...`. Keep subjects short and imperative.
 
 PRs should include a concise summary, linked issue or context, test evidence (`pnpm test`, `pnpm backend:test`, etc.), and screenshots or request/response samples when changing extension UX, auth flows, or backend endpoints. Update docs when setup, env vars, or deployment behavior changes.
