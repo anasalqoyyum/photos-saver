@@ -9,10 +9,12 @@ interface BackendSession {
 }
 
 const BACKEND_SESSION_STORAGE_KEY = 'backendSession'
+const SESSION_REFRESH_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
 
 let backendSession: BackendSession | null = null
 let hasLoadedBackendSession = false
 let loadBackendSessionPromise: Promise<void> | null = null
+let activeSessionRefreshPromise: Promise<BackendSession | null> | null = null
 let activeAuthFlowPromise: Promise<string> | null = null
 
 function getBackendBaseUrl(): string {
@@ -24,12 +26,12 @@ function getBackendBaseUrl(): string {
   return value.replace(/\/$/, '')
 }
 
-function shouldReuseSession(session: BackendSession | null): boolean {
-  if (!session) {
-    return false
-  }
+function isSessionExpired(session: BackendSession): boolean {
+  return Date.now() >= session.expiresAt
+}
 
-  return Date.now() + 30_000 < session.expiresAt
+function shouldRefreshSession(session: BackendSession): boolean {
+  return Date.now() + SESSION_REFRESH_WINDOW_MS >= session.expiresAt
 }
 
 function isBackendSession(value: unknown): value is BackendSession {
@@ -170,6 +172,34 @@ async function refreshBackendSessionToken(session: BackendSession): Promise<Back
   }
 }
 
+async function renewBackendSession(session: BackendSession): Promise<BackendSession | null> {
+  if (activeSessionRefreshPromise) {
+    return activeSessionRefreshPromise
+  }
+
+  activeSessionRefreshPromise = (async () => {
+    const refreshedSession = await refreshBackendSessionToken(session)
+    if (!refreshedSession) {
+      return null
+    }
+
+    backendSession = refreshedSession
+    await persistBackendSession(refreshedSession)
+
+    debug('Backend auth session refreshed without Google OAuth prompt.', {
+      expiresAt: refreshedSession.expiresAt
+    })
+
+    return refreshedSession
+  })()
+
+  try {
+    return await activeSessionRefreshPromise
+  } finally {
+    activeSessionRefreshPromise = null
+  }
+}
+
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer)
   const chunkSize = 0x8000
@@ -212,27 +242,23 @@ async function ensureBackendSessionToken(): Promise<string> {
   await loadBackendSessionFromStorage()
 
   const existingSession = backendSession
-  if (existingSession && shouldReuseSession(existingSession)) {
-    return existingSession.token
-  }
-
   if (existingSession) {
-    try {
-      const refreshedSession = await refreshBackendSessionToken(existingSession)
-      if (refreshedSession) {
-        backendSession = refreshedSession
-        await persistBackendSession(refreshedSession)
-
-        debug('Backend auth session refreshed without Google OAuth prompt.', {
-          expiresAt: refreshedSession.expiresAt
-        })
-
-        return refreshedSession.token
+    if (!isSessionExpired(existingSession)) {
+      if (!shouldRefreshSession(existingSession)) {
+        return existingSession.token
       }
-    } catch (error) {
-      warn('Backend session refresh failed; falling back to full auth flow.', {
-        message: error instanceof Error ? error.message : 'Unknown error'
-      })
+
+      try {
+        const refreshedSession = await renewBackendSession(existingSession)
+        if (refreshedSession) {
+          return refreshedSession.token
+        }
+      } catch (error) {
+        warn('Backend session refresh failed; continuing with existing session.', {
+          message: error instanceof Error ? error.message : 'Unknown error'
+        })
+        return existingSession.token
+      }
     }
 
     backendSession = null
