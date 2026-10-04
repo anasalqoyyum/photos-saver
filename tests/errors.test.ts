@@ -19,4 +19,8 @@ describe('toUserMessage', () => {
     const msg = toUserMessage(new ExtensionError('AUTH_FAILED', 'x'))
     expect(msg).toBe('Google sign-in failed. Please try again.')
   })
+
+  it('explains session storage failures', () => {
+    expect(toUserMessage(new ExtensionError('STORAGE_FAILED', 'x'))).toBe('Could not save or read your sign-in session. Please try again.')
+  })
 })

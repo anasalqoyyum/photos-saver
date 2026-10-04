@@ -13,9 +13,7 @@ const SESSION_REFRESH_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
 
 let backendSession: BackendSession | null = null
 let hasLoadedBackendSession = false
-let loadBackendSessionPromise: Promise<void> | null = null
-let activeSessionRefreshPromise: Promise<BackendSession | null> | null = null
-let activeAuthFlowPromise: Promise<string> | null = null
+let activeSessionPromise: Promise<string> | null = null
 
 function getBackendBaseUrl(): string {
   const value = BACKEND_BASE_URL.trim()
@@ -53,14 +51,11 @@ function isBackendSession(value: unknown): value is BackendSession {
 }
 
 function getStorageValue(key: string): Promise<unknown> {
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     chrome.storage.local.get(key, values => {
       const runtimeError = chrome.runtime.lastError
       if (runtimeError) {
-        warn('Failed to read backend session from storage.', {
-          message: runtimeError.message
-        })
-        resolve(null)
+        reject(new ExtensionError('STORAGE_FAILED', runtimeError.message || 'Failed to read backend session from storage.'))
         return
       }
 
@@ -70,13 +65,12 @@ function getStorageValue(key: string): Promise<unknown> {
 }
 
 function setStorageValue(key: string, value: unknown): Promise<void> {
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     chrome.storage.local.set({ [key]: value }, () => {
       const runtimeError = chrome.runtime.lastError
       if (runtimeError) {
-        warn('Failed to persist backend session to storage.', {
-          message: runtimeError.message
-        })
+        reject(new ExtensionError('STORAGE_FAILED', runtimeError.message || 'Failed to persist backend session to storage.'))
+        return
       }
 
       resolve()
@@ -85,13 +79,12 @@ function setStorageValue(key: string, value: unknown): Promise<void> {
 }
 
 function removeStorageValue(key: string): Promise<void> {
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     chrome.storage.local.remove(key, () => {
       const runtimeError = chrome.runtime.lastError
       if (runtimeError) {
-        warn('Failed to remove backend session from storage.', {
-          message: runtimeError.message
-        })
+        reject(new ExtensionError('STORAGE_FAILED', runtimeError.message || 'Failed to remove backend session from storage.'))
+        return
       }
 
       resolve()
@@ -113,31 +106,18 @@ async function loadBackendSessionFromStorage(): Promise<void> {
     return
   }
 
-  if (loadBackendSessionPromise) {
-    await loadBackendSessionPromise
+  const storedValue = await getStorageValue(BACKEND_SESSION_STORAGE_KEY)
+  if (!isBackendSession(storedValue)) {
+    hasLoadedBackendSession = true
     return
   }
 
-  loadBackendSessionPromise = (async () => {
-    const storedValue = await getStorageValue(BACKEND_SESSION_STORAGE_KEY)
-    if (!isBackendSession(storedValue)) {
-      hasLoadedBackendSession = true
-      return
-    }
+  backendSession = storedValue
+  hasLoadedBackendSession = true
 
-    backendSession = storedValue
-    hasLoadedBackendSession = true
-
-    debug('Reused persisted backend session.', {
-      expiresAt: storedValue.expiresAt
-    })
-  })()
-
-  try {
-    await loadBackendSessionPromise
-  } finally {
-    loadBackendSessionPromise = null
-  }
+  debug('Reused persisted backend session.', {
+    expiresAt: storedValue.expiresAt
+  })
 }
 
 async function refreshBackendSessionToken(session: BackendSession): Promise<BackendSession | null> {
@@ -169,34 +149,6 @@ async function refreshBackendSessionToken(session: BackendSession): Promise<Back
   return {
     token: payload.sessionToken,
     expiresAt: payload.expiresAt
-  }
-}
-
-async function renewBackendSession(session: BackendSession): Promise<BackendSession | null> {
-  if (activeSessionRefreshPromise) {
-    return activeSessionRefreshPromise
-  }
-
-  activeSessionRefreshPromise = (async () => {
-    const refreshedSession = await refreshBackendSessionToken(session)
-    if (!refreshedSession) {
-      return null
-    }
-
-    backendSession = refreshedSession
-    await persistBackendSession(refreshedSession)
-
-    debug('Backend auth session refreshed without Google OAuth prompt.', {
-      expiresAt: refreshedSession.expiresAt
-    })
-
-    return refreshedSession
-  })()
-
-  try {
-    return await activeSessionRefreshPromise
-  } finally {
-    activeSessionRefreshPromise = null
   }
 }
 
@@ -238,8 +190,13 @@ function launchWebAuthFlow(url: string): Promise<string> {
   })
 }
 
-async function ensureBackendSessionToken(): Promise<string> {
+async function resolveBackendSessionToken(rejectedToken?: string): Promise<string> {
   await loadBackendSessionFromStorage()
+
+  if (rejectedToken && backendSession?.token === rejectedToken) {
+    await persistBackendSession(null)
+    backendSession = null
+  }
 
   const existingSession = backendSession
   if (existingSession) {
@@ -248,107 +205,117 @@ async function ensureBackendSessionToken(): Promise<string> {
         return existingSession.token
       }
 
+      let refreshedSession: BackendSession | null
       try {
-        const refreshedSession = await renewBackendSession(existingSession)
-        if (refreshedSession) {
-          return refreshedSession.token
-        }
+        refreshedSession = await refreshBackendSessionToken(existingSession)
       } catch (error) {
         warn('Backend session refresh failed; continuing with existing session.', {
           message: error instanceof Error ? error.message : 'Unknown error'
         })
         return existingSession.token
       }
+
+      if (refreshedSession) {
+        await persistBackendSession(refreshedSession)
+        backendSession = refreshedSession
+        debug('Backend auth session refreshed without Google OAuth prompt.', {
+          expiresAt: refreshedSession.expiresAt
+        })
+        return refreshedSession.token
+      }
     }
 
-    backendSession = null
     await persistBackendSession(null)
+    backendSession = null
   }
 
-  if (activeAuthFlowPromise) {
-    return activeAuthFlowPromise
-  }
+  const backendBaseUrl = getBackendBaseUrl()
+  const extensionRedirectUri = chrome.identity.getRedirectURL()
 
-  activeAuthFlowPromise = (async () => {
-    const backendBaseUrl = getBackendBaseUrl()
-    const extensionRedirectUri = chrome.identity.getRedirectURL()
+  debug('Starting backend auth flow.', {
+    backendBaseUrl,
+    extensionRedirectUri
+  })
 
-    debug('Starting backend auth flow.', {
-      backendBaseUrl,
+  const startResponse = await fetch(`${backendBaseUrl}/v1/auth/start`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
       extensionRedirectUri
     })
+  })
 
-    const startResponse = await fetch(`${backendBaseUrl}/v1/auth/start`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        extensionRedirectUri
-      })
+  if (!startResponse.ok) {
+    throw new ExtensionError('AUTH_FAILED', `Backend auth start failed with status ${startResponse.status}.`)
+  }
+
+  const startPayload = (await startResponse.json()) as {
+    authUrl?: string
+  }
+
+  const authUrl = startPayload.authUrl
+  if (!authUrl) {
+    throw new ExtensionError('AUTH_FAILED', 'Backend auth start returned no authUrl.')
+  }
+
+  const redirectUrl = await launchWebAuthFlow(authUrl)
+  const redirect = new URL(redirectUrl)
+  const sessionCode = redirect.searchParams.get('session_code')
+  if (!sessionCode) {
+    throw new ExtensionError('AUTH_FAILED', 'Backend callback did not include session_code.')
+  }
+
+  const exchangeResponse = await fetch(`${backendBaseUrl}/v1/auth/exchange`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      sessionCode
     })
+  })
 
-    if (!startResponse.ok) {
-      throw new ExtensionError('AUTH_FAILED', `Backend auth start failed with status ${startResponse.status}.`)
-    }
+  if (!exchangeResponse.ok) {
+    throw new ExtensionError('AUTH_FAILED', `Backend auth exchange failed with status ${exchangeResponse.status}.`)
+  }
 
-    const startPayload = (await startResponse.json()) as {
-      authUrl?: string
-    }
+  const exchangePayload = (await exchangeResponse.json()) as {
+    sessionToken?: string
+    expiresAt?: number
+  }
 
-    const authUrl = startPayload.authUrl
-    if (!authUrl) {
-      throw new ExtensionError('AUTH_FAILED', 'Backend auth start returned no authUrl.')
-    }
+  if (!exchangePayload.sessionToken || typeof exchangePayload.expiresAt !== 'number') {
+    throw new ExtensionError('AUTH_FAILED', 'Backend auth exchange returned invalid payload.')
+  }
 
-    const redirectUrl = await launchWebAuthFlow(authUrl)
-    const redirect = new URL(redirectUrl)
-    const sessionCode = redirect.searchParams.get('session_code')
-    if (!sessionCode) {
-      throw new ExtensionError('AUTH_FAILED', 'Backend callback did not include session_code.')
-    }
+  const session = {
+    token: exchangePayload.sessionToken,
+    expiresAt: exchangePayload.expiresAt
+  }
 
-    const exchangeResponse = await fetch(`${backendBaseUrl}/v1/auth/exchange`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        sessionCode
-      })
-    })
+  await persistBackendSession(session)
+  backendSession = session
 
-    if (!exchangeResponse.ok) {
-      throw new ExtensionError('AUTH_FAILED', `Backend auth exchange failed with status ${exchangeResponse.status}.`)
-    }
+  debug('Backend auth session established.', {
+    expiresAt: exchangePayload.expiresAt
+  })
 
-    const exchangePayload = (await exchangeResponse.json()) as {
-      sessionToken?: string
-      expiresAt?: number
-    }
+  return session.token
+}
 
-    if (!exchangePayload.sessionToken || typeof exchangePayload.expiresAt !== 'number') {
-      throw new ExtensionError('AUTH_FAILED', 'Backend auth exchange returned invalid payload.')
-    }
+async function ensureBackendSessionToken(rejectedToken?: string): Promise<string> {
+  if (activeSessionPromise) {
+    const token = await activeSessionPromise
+    return token === rejectedToken ? ensureBackendSessionToken(rejectedToken) : token
+  }
 
-    backendSession = {
-      token: exchangePayload.sessionToken,
-      expiresAt: exchangePayload.expiresAt
-    }
-
-    await persistBackendSession(backendSession)
-
-    debug('Backend auth session established.', {
-      expiresAt: exchangePayload.expiresAt
-    })
-
-    return backendSession.token
-  })()
-
+  activeSessionPromise = resolveBackendSessionToken(rejectedToken)
   try {
-    return await activeAuthFlowPromise
+    return await activeSessionPromise
   } finally {
-    activeAuthFlowPromise = null
+    activeSessionPromise = null
   }
 }
 
@@ -390,10 +357,8 @@ export async function uploadImageViaBackend(image: FetchedImage, pageUrl?: strin
       throw error
     }
 
-    warn('Backend session rejected upload. Re-authenticating and retrying once.')
-    backendSession = null
-    await persistBackendSession(null)
-    const refreshedToken = await ensureBackendSessionToken()
+    warn('Backend session rejected upload. Resolving session and retrying once.')
+    const refreshedToken = await ensureBackendSessionToken(sessionToken)
     await uploadOnce(image, refreshedToken, pageUrl)
   }
 }

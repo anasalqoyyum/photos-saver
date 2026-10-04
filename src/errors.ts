@@ -1,4 +1,11 @@
-export type ExtensionErrorCode = 'INVALID_IMAGE_URL' | 'AUTH_FAILED' | 'FETCH_FAILED' | 'UPLOAD_FAILED' | 'CREATE_FAILED' | 'UNKNOWN'
+export type ExtensionErrorCode =
+  | 'INVALID_IMAGE_URL'
+  | 'AUTH_FAILED'
+  | 'STORAGE_FAILED'
+  | 'FETCH_FAILED'
+  | 'UPLOAD_FAILED'
+  | 'CREATE_FAILED'
+  | 'UNKNOWN'
 
 export class ExtensionError extends Error {
   public readonly code: ExtensionErrorCode
@@ -28,6 +35,8 @@ export function toUserMessage(err: ExtensionError): string {
       return 'Cannot save this image URL.'
     case 'AUTH_FAILED':
       return 'Google sign-in failed. Please try again.'
+    case 'STORAGE_FAILED':
+      return 'Could not save or read your sign-in session. Please try again.'
     case 'FETCH_FAILED':
       return 'Image download failed. Site may block access.'
     case 'UPLOAD_FAILED':
