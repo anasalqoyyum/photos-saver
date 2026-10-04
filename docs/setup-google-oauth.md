@@ -52,9 +52,13 @@ Note: The extension ID must match the ID used in OAuth credentials.
 
 1. Open `APIs & Services` -> `Credentials` -> `Create credentials` -> `OAuth client ID`.
 2. Application type: `Web application`.
-3. Add Authorized redirect URI using the Firefox runtime redirect host:
-   - `https://save-to-google-photos.example.extensions.mozilla.org/`
-4. Copy this web client ID.
+3. Build and temporarily load the extension in Firefox using the steps in section 6.
+4. In `about:debugging#/runtime/this-firefox`, click `Inspect` for this extension and run this in its console:
+   ```js
+   chrome.identity.getRedirectURL()
+   ```
+5. Copy the returned URL, including its trailing slash, into the client's Authorized redirect URIs. Firefox derives this URL from `browser_specific_settings.gecko.id`; keep that ID stable. See [Mozilla's redirect URL documentation](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/identity/getRedirectURL).
+6. Copy this web client ID into `FIREFOX_WEB_OAUTH_CLIENT_ID` in `src/oauth-config.ts`, then rebuild and reload the extension.
 
 ## 5) Update manifest
 
@@ -77,8 +81,8 @@ If `key` is not set, Chrome can generate different IDs in different environments
    - `pnpm install`
 2. Transpile TypeScript:
    - `pnpm build`
-3. Open `chrome://extensions` for Chrome or `about:debugging#/runtime/this-firefox` for Firefox.
-4. Load this repo root as the unpacked/temporary extension.
+3. Open `chrome://extensions` for Chrome 121 or later, or `about:debugging#/runtime/this-firefox` for Firefox 121 or later.
+4. In Chrome, click `Load unpacked` and select this repo root. In Firefox, click `Load Temporary Add-on` and select this repo's `manifest.json`.
 
 ## 7) Verify auth flow
 
@@ -103,10 +107,10 @@ If `key` is not set, Chrome can generate different IDs in different environments
   - If using a separate web client, set it in `src/oauth-config.ts` `WEB_OAUTH_CLIENT_ID`.
 - Firefox auth fails immediately:
   - Set `src/oauth-config.ts` `FIREFOX_WEB_OAUTH_CLIENT_ID` to a Web OAuth client.
-  - Add the Firefox redirect URI `https://save-to-google-photos.example.extensions.mozilla.org/` to that client.
+  - Inspect the extension in `about:debugging#/runtime/this-firefox`, run `chrome.identity.getRedirectURL()`, and add the returned URL to that client's Authorized redirect URIs.
 - `redirect_uri_mismatch` during PKCE fallback:
-  - The redirect URI must be exactly `https://<your-extension-id>.chromiumapp.org/`.
-  - In the Web OAuth client, add that exact URI under Authorized redirect URIs.
-  - Ensure `<your-extension-id>` matches the runtime ID shown in service worker logs.
+  - Run `chrome.identity.getRedirectURL()` in the extension's background console and add the exact returned URL to the Web OAuth client's Authorized redirect URIs.
+  - Chrome returns `https://<your-extension-id>.chromiumapp.org/`; Firefox returns a URL derived from its Gecko extension ID.
+  - Keep the extension ID stable and include the trailing slash when registering the URL.
 
 If you switch to backend mode, use `docs/setup-backend-workers.md` for Workers backend OAuth setup.

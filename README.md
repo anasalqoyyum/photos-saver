@@ -20,7 +20,7 @@ When clicked, it uploads the original image bytes to Google Photos with:
 ## Project structure
 
 - `manifest.json` - shared MV3 extension manifest for Chrome and Firefox.
-- `src/sw.ts` - service worker entrypoint.
+- `src/sw.ts` - Chrome service worker and Firefox background script entrypoint.
 - `src/auth.ts` - OAuth token handling.
 - `src/image-fetch.ts` - source image download logic.
 - `src/photos-api.ts` - Google Photos API integration.
@@ -41,7 +41,7 @@ When clicked, it uploads the original image bytes to Google Photos with:
    - `pnpm install`
 3. Build TypeScript to `dist/`:
    - `pnpm build`
-4. Load unpacked extension in `chrome://extensions` or `about:debugging#/runtime/this-firefox`.
+4. Load this repo root in `chrome://extensions`, or select `manifest.json` through `Load Temporary Add-on` in `about:debugging#/runtime/this-firefox`.
 
 ## Backend mode (optional)
 
@@ -65,9 +65,9 @@ When clicked, it uploads the original image bytes to Google Photos with:
 
 ## Browser compatibility
 
-- Chrome: uses `chrome.identity.getAuthToken` first.
+- Chrome 121 or later: uses `chrome.identity.getAuthToken` first.
 - ungoogled-chromium: if `getAuthToken` fails or times out, extension falls back to OAuth PKCE via `chrome.identity.launchWebAuthFlow`.
-- Firefox: uses OAuth PKCE via `chrome.identity.launchWebAuthFlow`; set `FIREFOX_WEB_OAUTH_CLIENT_ID` in `src/oauth-config.ts` before authenticating.
+- Firefox 121 or later: runs a module background script and uses OAuth PKCE via `chrome.identity.launchWebAuthFlow`; set `FIREFOX_WEB_OAUTH_CLIENT_ID` in `src/oauth-config.ts` before authenticating.
 - PKCE fallback reuses `manifest.json` `oauth2.client_id` by default; optional override is available in `src/oauth-config.ts`.
 - Backend mode avoids browser-specific OAuth implementation differences by delegating auth and Google API calls to Worker backend endpoints.
 
