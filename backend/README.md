@@ -36,6 +36,31 @@ EXCHANGE_CODE_TTL_MS=300000 / 5 minutes
 - `POST /v1/auth/logout`
 - `POST /v1/photos/upload`
 
+## Session renewal
+
+The extension renews an unexpired backend session when seven days or less remain.
+`POST /v1/auth/refresh` issues a new token with the configured `SESSION_TTL_MS`.
+The previous token remains valid until its original expiry, so a lost refresh
+response or failed storage write does not invalidate the client's saved token.
+Retries can create additional sessions. Renewal does not extend the old token's
+lifetime, and logout revokes only the token supplied to that request.
+
+The extension saves the replacement before using it. Storage failures stop the
+upload and report an error; another attempt can retry renewal with the saved
+token. If that token expires before recovery, Google sign-in is still required.
+Concurrent uploads share session resolution, and a delayed rejection of an old
+token cannot clear a newer session.
+
+KV reads can be stale. Missing or expired session reads return no session without
+deleting the key; KV expiration and explicit logout handle removal. A transient
+KV miss can still reject authentication, but it no longer deletes a valid record.
+
+Deploy the Worker with `pnpm backend:deploy`, then rebuild the extension with
+`pnpm build` and reload it in `chrome://extensions`. Deploy the Worker first so
+the extension can recover from refresh failures without losing the saved token.
+Pushing source code alone does not deploy the Worker or update Chrome's loaded
+extension. No database migration is needed for these changes.
+
 ## Local development
 
 1. Install deps:
