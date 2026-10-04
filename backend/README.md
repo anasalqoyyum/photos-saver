@@ -58,8 +58,11 @@ KV miss can still reject authentication, but it no longer deletes a valid record
 Deploy the Worker with `pnpm backend:deploy`, then rebuild the extension with
 `pnpm build` and reload it in `chrome://extensions`. Deploy the Worker first so
 the extension can recover from refresh failures without losing the saved token.
-Pushing source code alone does not deploy the Worker or update Chrome's loaded
-extension. No database migration is needed for these changes.
+The GitHub Actions workflow only runs checks. Worker deployment runs separately,
+either through Cloudflare's Git integration or a manual deploy. Confirm the
+production version before reloading Chrome; a successful branch build does not
+by itself identify the version serving production. Chrome still requires a
+rebuilt and reloaded extension. No database migration is needed for these changes.
 
 ## Local development
 
