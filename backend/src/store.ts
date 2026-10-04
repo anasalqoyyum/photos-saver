@@ -365,7 +365,6 @@ export class CloudflareKVSessionStore implements SessionStore {
     const record = safeParseJson<SessionRecord>(raw)
 
     if (!record || isExpired(record.expiresAt)) {
-      await this.kv.delete(key)
       return null
     }
 

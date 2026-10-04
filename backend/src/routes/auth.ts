@@ -159,7 +159,6 @@ export async function handleAuthRefresh(request: Request, options: AuthRoutesOpt
   }
 
   const refreshedSession = await options.sessionStore.create(existingSession.userId, options.config.sessionTtlMs)
-  await options.sessionStore.revoke(token)
 
   return jsonResponse({
     sessionToken: refreshedSession.token,
